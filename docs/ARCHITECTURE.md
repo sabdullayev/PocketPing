@@ -69,8 +69,8 @@ PocketPing/
 │   ├── ARCHITECTURE.md            # Данный архитектурный документ
 │   └── FEATURES_LOG.md            # Лог реализованных фичей и изменений
 ├── lib/
-│   ├── app.dart                   # Корневой MaterialApp, темы, роуты
-│   ├── main.dart                  # Точка входа, инициализация DI и БД
+│   ├── app.dart                   # Корневой MaterialApp, MultiBlocProvider, темы
+│   ├── main.dart                  # Точка входа, инициализация DI и Hive
 │   ├── core/                      # Общий код для всех фичей
 │   │   ├── constants/             # Цвета, размеры, строковые константы
 │   │   ├── di/                    # Регистрация зависимостей в GetIt
@@ -80,11 +80,12 @@ PocketPing/
 │   │   ├── theme/                 # Стили, темная/светлая тема
 │   │   └── utils/                 # cURL парсер, форматтеры, валидаторы
 │   └── features/                  # Модули приложения
+│       ├── home/                  # Главная навигация (MainNavigationShell)
 │       ├── request_builder/       # Конструктор HTTP-запросов и импорт cURL
 │       ├── response_viewer/       # Просмотр ответа, метрик, дерево JSON
-│       ├── collections/           # Папки, коллекции сохраненных запросов
+│       ├── collections/           # Папки, коллекции сохраненных запросов (Hive)
 │       ├── environments/          # Переменные ({{base_url}}) и переключение Dev/Prod
-│       ├── history/               # История отправленных запросов
+│       ├── history/               # История отправленных запросов (Hive)
 │       └── monitor/               # Фоновый пинг серверов (Health Check)
 ```
 

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../collections/presentation/widgets/save_to_collection_dialog.dart';
 import '../../../response_viewer/presentation/widgets/metrics_bar_widget.dart';
 import '../../../response_viewer/presentation/widgets/response_body_view.dart';
 import '../../domain/entities/request_body.dart';
@@ -110,6 +111,12 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
               ],
             ),
             actions: [
+              // Save to Collection
+              IconButton(
+                icon: const Icon(Icons.bookmark_add_outlined, size: 20, color: AppColors.primary),
+                tooltip: 'Save to Collection',
+                onPressed: () => SaveToCollectionDialog.show(context, state.request),
+              ),
               // Killer feature: 1-tap cURL import
               TextButton.icon(
                 onPressed: _importCurlFromClipboard,

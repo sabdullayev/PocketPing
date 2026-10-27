@@ -1,6 +1,9 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../core/services/json_isolate_service.dart';
 import '../../../../core/utils/curl_parser.dart';
+import '../../../history/domain/entities/history_item_entity.dart';
+import '../../../history/domain/usecases/history_usecases.dart';
 import '../../domain/entities/key_value_param.dart';
 import '../../domain/usecases/execute_request_usecase.dart';
 import 'request_builder_event.dart';
@@ -8,9 +11,12 @@ import 'request_builder_state.dart';
 
 class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> {
   final ExecuteRequestUseCase executeRequestUseCase;
+  final SaveHistoryItemUseCase? saveHistoryItemUseCase;
 
-  RequestBuilderBloc({required this.executeRequestUseCase})
-      : super(RequestBuilderState.initial()) {
+  RequestBuilderBloc({
+    required this.executeRequestUseCase,
+    this.saveHistoryItemUseCase,
+  }) : super(RequestBuilderState.initial()) {
     on<ChangeMethodEvent>(_onChangeMethod);
     on<ChangeUrlEvent>(_onChangeUrl);
     on<AddQueryParamEvent>(_onAddQueryParam);
@@ -27,6 +33,16 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
     on<FormatJsonBodyEvent>(_onFormatJsonBody);
     on<ImportCurlEvent>(_onImportCurl);
     on<SendRequestEvent>(_onSendRequest);
+    on<LoadRequestEvent>(_onLoadRequest);
+  }
+
+  void _onLoadRequest(LoadRequestEvent event, Emitter<RequestBuilderState> emit) {
+    emit(state.copyWith(
+      request: event.request,
+      clearResponse: true,
+      clearError: true,
+      clearInfo: true,
+    ));
   }
 
   void _onChangeMethod(ChangeMethodEvent event, Emitter<RequestBuilderState> emit) {
@@ -214,6 +230,20 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
     ));
 
     final response = await executeRequestUseCase(state.request);
+
+    // Automatically persist to history if use case available
+    if (saveHistoryItemUseCase != null) {
+      try {
+        await saveHistoryItemUseCase!(
+          HistoryItemEntity(
+            id: const Uuid().v4(),
+            request: state.request,
+            response: response,
+            executedAt: DateTime.now(),
+          ),
+        );
+      } catch (_) {}
+    }
 
     emit(state.copyWith(
       isLoading: false,

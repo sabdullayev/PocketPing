@@ -1,5 +1,16 @@
 import 'package:get_it/get_it.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import '../network/dio_client.dart';
+import '../../features/collections/data/datasources/collections_local_datasource.dart';
+import '../../features/collections/data/repositories/collections_repository_impl.dart';
+import '../../features/collections/domain/repositories/collections_repository.dart';
+import '../../features/collections/domain/usecases/collections_usecases.dart';
+import '../../features/collections/presentation/bloc/collections_bloc.dart';
+import '../../features/history/data/datasources/history_local_datasource.dart';
+import '../../features/history/data/repositories/history_repository_impl.dart';
+import '../../features/history/domain/repositories/history_repository.dart';
+import '../../features/history/domain/usecases/history_usecases.dart';
+import '../../features/history/presentation/bloc/history_bloc.dart';
 import '../../features/request_builder/data/repositories/request_repository_impl.dart';
 import '../../features/request_builder/domain/repositories/request_repository.dart';
 import '../../features/request_builder/domain/usecases/execute_request_usecase.dart';
@@ -7,22 +18,90 @@ import '../../features/request_builder/presentation/bloc/request_builder_bloc.da
 
 final sl = GetIt.instance;
 
-Future<void> initDependencies() async {
-  // Core
+Future<void> initDependencies({String? hivePath}) async {
+  // 1. Hive Storage Initialization
+  if (hivePath != null) {
+    Hive.init(hivePath);
+  } else {
+    await Hive.initFlutter();
+  }
+
+  // 2. Core
   sl.registerLazySingleton<DioClient>(() => DioClient());
 
-  // Repositories
+  // 3. Request Builder Feature
   sl.registerLazySingleton<RequestRepository>(
     () => RequestRepositoryImpl(dioClient: sl()),
   );
-
-  // UseCases
   sl.registerLazySingleton<ExecuteRequestUseCase>(
     () => ExecuteRequestUseCase(sl()),
   );
 
-  // BLoCs
+  // 4. History Feature
+  sl.registerLazySingleton<HistoryLocalDataSource>(
+    () => HistoryLocalDataSourceImpl(),
+  );
+  sl.registerLazySingleton<HistoryRepository>(
+    () => HistoryRepositoryImpl(localDataSource: sl()),
+  );
+  sl.registerLazySingleton<GetHistoryUseCase>(
+    () => GetHistoryUseCase(sl()),
+  );
+  sl.registerLazySingleton<SaveHistoryItemUseCase>(
+    () => SaveHistoryItemUseCase(sl()),
+  );
+  sl.registerLazySingleton<DeleteHistoryItemUseCase>(
+    () => DeleteHistoryItemUseCase(sl()),
+  );
+  sl.registerLazySingleton<ClearHistoryUseCase>(
+    () => ClearHistoryUseCase(sl()),
+  );
+  sl.registerFactory<HistoryBloc>(
+    () => HistoryBloc(
+      getHistoryUseCase: sl(),
+      saveHistoryItemUseCase: sl(),
+      deleteHistoryItemUseCase: sl(),
+      clearHistoryUseCase: sl(),
+    ),
+  );
+
+  // 5. Collections Feature
+  sl.registerLazySingleton<CollectionsLocalDataSource>(
+    () => CollectionsLocalDataSourceImpl(),
+  );
+  sl.registerLazySingleton<CollectionsRepository>(
+    () => CollectionsRepositoryImpl(localDataSource: sl()),
+  );
+  sl.registerLazySingleton<GetCollectionsUseCase>(
+    () => GetCollectionsUseCase(sl()),
+  );
+  sl.registerLazySingleton<SaveCollectionUseCase>(
+    () => SaveCollectionUseCase(sl()),
+  );
+  sl.registerLazySingleton<DeleteCollectionUseCase>(
+    () => DeleteCollectionUseCase(sl()),
+  );
+  sl.registerLazySingleton<SaveRequestToCollectionUseCase>(
+    () => SaveRequestToCollectionUseCase(sl()),
+  );
+  sl.registerLazySingleton<RemoveRequestFromCollectionUseCase>(
+    () => RemoveRequestFromCollectionUseCase(sl()),
+  );
+  sl.registerFactory<CollectionsBloc>(
+    () => CollectionsBloc(
+      getCollectionsUseCase: sl(),
+      saveCollectionUseCase: sl(),
+      deleteCollectionUseCase: sl(),
+      saveRequestToCollectionUseCase: sl(),
+      removeRequestFromCollectionUseCase: sl(),
+    ),
+  );
+
+  // 6. Request Builder Bloc (injected with SaveHistoryItemUseCase)
   sl.registerFactory<RequestBuilderBloc>(
-    () => RequestBuilderBloc(executeRequestUseCase: sl()),
+    () => RequestBuilderBloc(
+      executeRequestUseCase: sl(),
+      saveHistoryItemUseCase: sl(),
+    ),
   );
 }

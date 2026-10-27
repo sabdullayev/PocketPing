@@ -1,5 +1,6 @@
 import 'package:equatable/equatable.dart';
 import '../../domain/entities/http_method.dart';
+import '../../domain/entities/http_request_entity.dart';
 import '../../domain/entities/request_body.dart';
 
 abstract class RequestBuilderEvent extends Equatable {
@@ -123,4 +124,12 @@ class ImportCurlEvent extends RequestBuilderEvent {
 
 class SendRequestEvent extends RequestBuilderEvent {
   const SendRequestEvent();
+}
+
+class LoadRequestEvent extends RequestBuilderEvent {
+  final HttpRequestEntity request;
+  const LoadRequestEvent(this.request);
+
+  @override
+  List<Object?> get props => [request];
 }

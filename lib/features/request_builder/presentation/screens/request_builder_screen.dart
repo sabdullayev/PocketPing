@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../collections/presentation/widgets/save_to_collection_dialog.dart';
+import '../../../environments/domain/entities/environment_variable.dart';
+import '../../../environments/presentation/bloc/environments_bloc.dart';
+import '../../../environments/presentation/bloc/environments_state.dart';
 import '../../../environments/presentation/widgets/environment_selector_widget.dart';
 import '../../../response_viewer/presentation/widgets/metrics_bar_widget.dart';
 import '../../../response_viewer/presentation/widgets/response_body_view.dart';
@@ -27,6 +30,11 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _requestTabController;
   late final TextEditingController _urlController;
+  final FocusNode _urlFocusNode = FocusNode();
+
+  String? _activeVariableQuery;
+  bool _isDoubleBrace = false;
+  bool _showSuggestions = false;
 
   @override
   void initState() {
@@ -34,13 +42,69 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
     _requestTabController = TabController(length: 4, vsync: this);
     final initialUrl = context.read<RequestBuilderBloc>().state.request.url;
     _urlController = TextEditingController(text: initialUrl);
+    _urlFocusNode.addListener(() {
+      if (!_urlFocusNode.hasFocus && _showSuggestions) {
+        setState(() => _showSuggestions = false);
+      }
+    });
   }
 
   @override
   void dispose() {
     _requestTabController.dispose();
     _urlController.dispose();
+    _urlFocusNode.dispose();
     super.dispose();
+  }
+
+  void _checkVariableTrigger(String text) {
+    final selection = _urlController.selection;
+    final cursorPosition = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    final textBefore = text.substring(0, cursorPosition);
+
+    final match = RegExp(r'\{(\{)?([a-zA-Z0-9_]*)$').firstMatch(textBefore);
+    if (match != null) {
+      final isDouble = match.group(1) != null;
+      final query = match.group(2) ?? '';
+      setState(() {
+        _isDoubleBrace = isDouble;
+        _activeVariableQuery = query;
+        _showSuggestions = true;
+      });
+    } else {
+      if (_showSuggestions) {
+        setState(() {
+          _showSuggestions = false;
+          _activeVariableQuery = null;
+        });
+      }
+    }
+  }
+
+  void _insertVariableSuggestion(String varKey) {
+    final text = _urlController.text;
+    final selection = _urlController.selection;
+    final cursorPosition = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+    final textBefore = text.substring(0, cursorPosition);
+    final textAfter = text.substring(cursorPosition);
+
+    final match = RegExp(r'\{(\{)?([a-zA-Z0-9_]*)$').firstMatch(textBefore);
+    if (match != null) {
+      final startIndex = match.start;
+      final inserted = _isDoubleBrace ? '{{$varKey}}' : '{$varKey}';
+      final newText = textBefore.substring(0, startIndex) + inserted + textAfter;
+      final newCursorPosition = startIndex + inserted.length;
+
+      _urlController.value = TextEditingValue(
+        text: newText,
+        selection: TextSelection.collapsed(offset: newCursorPosition),
+      );
+      context.read<RequestBuilderBloc>().add(ChangeUrlEvent(newText));
+      setState(() {
+        _showSuggestions = false;
+        _activeVariableQuery = null;
+      });
+    }
   }
 
   Future<void> _importCurlFromClipboard() async {
@@ -177,27 +241,62 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                       Expanded(
                         child: TextField(
                           controller: _urlController,
+                          focusNode: _urlFocusNode,
                           keyboardType: TextInputType.url,
                           textInputAction: TextInputAction.go,
                           onSubmitted: (_) {
                             FocusScope.of(context).unfocus();
                             bloc.add(const SendRequestEvent());
                           },
-                          onChanged: (val) => bloc.add(ChangeUrlEvent(val)),
+                          onChanged: (val) {
+                            _checkVariableTrigger(val);
+                            bloc.add(ChangeUrlEvent(val));
+                          },
                           style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
                           decoration: InputDecoration(
-                            hintText: 'https://api.example.com/v1/resource',
+                            hintText: '{base_url}/todos/1',
                             isDense: true,
                             contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                            suffixIcon: _urlController.text.isNotEmpty
-                                ? IconButton(
+                            suffixIcon: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                IconButton(
+                                  icon: const Text(
+                                    '{}',
+                                    style: TextStyle(
+                                      color: AppColors.accent,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                  tooltip: 'Insert variable',
+                                  onPressed: () {
+                                    final text = _urlController.text;
+                                    final selection = _urlController.selection;
+                                    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+                                    final newText = '${text.substring(0, cursor)}{${text.substring(cursor)}';
+                                    _urlController.value = TextEditingValue(
+                                      text: newText,
+                                      selection: TextSelection.collapsed(offset: cursor + 1),
+                                    );
+                                    _urlFocusNode.requestFocus();
+                                    _checkVariableTrigger(newText);
+                                  },
+                                ),
+                                if (_urlController.text.isNotEmpty)
+                                  IconButton(
                                     icon: const Icon(Icons.clear, size: 16, color: AppColors.textMuted),
                                     onPressed: () {
                                       _urlController.clear();
                                       bloc.add(const ChangeUrlEvent(''));
+                                      setState(() {
+                                        _showSuggestions = false;
+                                        _activeVariableQuery = null;
+                                      });
                                     },
-                                  )
-                                : null,
+                                  ),
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -229,6 +328,10 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                     ],
                   ),
                 ),
+
+                // Variable autocomplete suggestions dropdown (IntelliSense)
+                if (_showSuggestions && _urlFocusNode.hasFocus)
+                  _buildVariableSuggestionsPanel(context),
 
                 // 2. Request Configuration Tabs (Params, Auth, Headers, Body)
                 Container(
@@ -365,6 +468,131 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
           ),
         );
       },
+    );
+  }
+
+  Widget _buildVariableSuggestionsPanel(BuildContext context) {
+    final envState = context.watch<EnvironmentsBloc>().state;
+    List<EnvironmentVariable> availableVars = [];
+    if (envState is EnvironmentsLoadedState && envState.selectedEnvironment != null) {
+      availableVars = envState.selectedEnvironment!.variables
+          .where((v) => v.isEnabled && v.key.trim().isNotEmpty)
+          .toList();
+    }
+
+    final query = _activeVariableQuery ?? '';
+    final matching = availableVars.where((v) {
+      if (query.isEmpty) return true;
+      return v.key.toLowerCase().contains(query.toLowerCase());
+    }).toList();
+
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.card,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6), width: 1.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.4),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            child: Row(
+              children: [
+                const Icon(Icons.auto_awesome, size: 14, color: AppColors.accent),
+                const SizedBox(width: 6),
+                const Text(
+                  'VARIABLES AUTOCOMPLETE',
+                  style: TextStyle(
+                    color: AppColors.accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0.8,
+                  ),
+                ),
+                const Spacer(),
+                const Text(
+                  'Tap to insert',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
+                ),
+              ],
+            ),
+          ),
+          const Divider(height: 1, color: AppColors.border),
+          if (matching.isEmpty)
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: Text(
+                availableVars.isEmpty
+                    ? 'No variables defined in active environment'
+                    : 'No variables matching "$query"',
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
+              ),
+            )
+          else
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 140),
+              child: ListView.separated(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: matching.length,
+                separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.border),
+                itemBuilder: (context, index) {
+                  final v = matching[index];
+                  return InkWell(
+                    onTap: () => _insertVariableSuggestion(v.key),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              _isDoubleBrace ? '{{${v.key}}}' : '{${v.key}}',
+                              style: const TextStyle(
+                                color: AppColors.accent,
+                                fontFamily: 'monospace',
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              v.value,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.textSecondary,
+                                fontFamily: 'monospace',
+                                fontSize: 11,
+                              ),
+                            ),
+                          ),
+                          const Icon(Icons.keyboard_return, size: 14, color: AppColors.textMuted),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
     );
   }
 }

@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_highlight/flutter_highlight.dart';
-import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/json_isolate_service.dart';
 import '../../domain/entities/http_response_entity.dart';
 import 'json_tree_view.dart';
+import 'virtualized_code_viewer.dart';
 
 class ResponseBodyView extends StatefulWidget {
   final HttpResponseEntity response;
@@ -167,43 +166,16 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
       );
     }
 
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: widget.response.isJson
-          ? HighlightView(
-              _formattedJson,
-              language: 'json',
-              theme: atomOneDarkTheme,
-              padding: const EdgeInsets.all(12),
-              textStyle: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                height: 1.4,
-              ),
-            )
-          : SelectableText(
-              widget.response.bodyString,
-              style: const TextStyle(
-                fontFamily: 'monospace',
-                fontSize: 12,
-                color: AppColors.textPrimary,
-              ),
-            ),
+    return VirtualizedCodeViewer(
+      content: widget.response.isJson ? _formattedJson : widget.response.bodyString,
+      isJson: widget.response.isJson,
     );
   }
 
   Widget _buildRawTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(12),
-      child: SelectableText(
-        widget.response.bodyString.isEmpty ? '(Empty response)' : widget.response.bodyString,
-        style: const TextStyle(
-          fontFamily: 'monospace',
-          fontSize: 12,
-          color: AppColors.textSecondary,
-          height: 1.4,
-        ),
-      ),
+    return VirtualizedCodeViewer(
+      content: widget.response.bodyString.isEmpty ? '(Empty response)' : widget.response.bodyString,
+      isJson: false,
     );
   }
 

@@ -21,17 +21,17 @@ void main() {
       isSelected: true,
     );
 
-    test('Substitutes variables in URL, headers, and body', () {
+    test('Substitutes variables in URL, headers, and body with {{var}} and {var}', () {
       final request = HttpRequestEntity(
         method: HttpMethod.post,
-        url: '{{base_url}}/users/{{user_id}}',
-        bearerToken: '{{token}}',
+        url: '{base_url}/users/{{user_id}}',
+        bearerToken: '{token}',
         queryParams: [
-          KeyValueParam(key: 'uid', value: '{{user_id}}', isEnabled: true),
+          KeyValueParam(key: 'uid', value: '{user_id}', isEnabled: true),
         ],
         body: const RequestBody(
           type: RequestBodyType.json,
-          rawContent: '{"userId": "{{user_id}}", "auth": "{{token}}"}',
+          rawContent: '{"userId": "{user_id}", "auth": "{{token}}"}',
         ),
       );
 

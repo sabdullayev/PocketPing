@@ -8,21 +8,23 @@ class SubstituteEnvVariablesUseCase {
       return request;
     }
 
-    // Build replacement map from enabled variables
-    final Map<String, String> replacements = {};
-    for (final v in activeEnvironment.variables) {
-      if (v.isEnabled && v.key.trim().isNotEmpty) {
-        replacements['{{${v.key.trim()}}}'] = v.value;
-      }
-    }
+    final enabledVars = activeEnvironment.variables
+        .where((v) => v.isEnabled && v.key.trim().isNotEmpty)
+        .toList();
 
-    if (replacements.isEmpty) return request;
+    if (enabledVars.isEmpty) return request;
+
+    // Sort by key length descending so longer variable names get matched first
+    enabledVars.sort((a, b) => b.key.trim().length.compareTo(a.key.trim().length));
 
     String replaceAllIn(String input) {
       String result = input;
-      replacements.forEach((pattern, value) {
-        result = result.replaceAll(pattern, value);
-      });
+      for (final v in enabledVars) {
+        final key = RegExp.escape(v.key.trim());
+        // Matches both {{key}} and {key}, with optional spaces like {{ key }} or { key }
+        final regex = RegExp(r'\{\{?\s*' + key + r'\s*\}\}?');
+        result = result.replaceAll(regex, v.value);
+      }
       return result;
     }
 

@@ -133,7 +133,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
 
   @override
   Widget build(BuildContext context) {
-    final isKeyboardOpen = View.of(context).viewInsets.bottom > 0;
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return BlocConsumer<RequestBuilderBloc, RequestBuilderState>(
       listener: (context, state) {
@@ -172,69 +172,72 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
 
         return Scaffold(
           resizeToAvoidBottomInset: true,
-          appBar: AppBar(
-            title: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(6),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(8),
+          appBar: isKeyboardOpen
+              ? null
+              : AppBar(
+                  title: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(6),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.2),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(Icons.bolt, color: AppColors.primary, size: 20),
+                      ),
+                      const SizedBox(width: 10),
+                      const Text('PocketPing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
+                    ],
                   ),
-                  child: const Icon(Icons.bolt, color: AppColors.primary, size: 20),
-                ),
-                const SizedBox(width: 10),
-                const Text('PocketPing', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18)),
-              ],
-            ),
-            actions: [
-              // Save to Collection
-              IconButton(
-                icon: const Icon(Icons.bookmark_add_outlined, size: 20, color: AppColors.primary),
-                tooltip: 'Save to Collection',
-                onPressed: () => SaveToCollectionDialog.show(context, state.request),
-              ),
-              // 1-Tap cURL Import & Long-press Export
-              Tooltip(
-                message: 'Tap: Import cURL/URL from clipboard\nLong-press: Copy as cURL',
-                child: TextButton.icon(
-                  onPressed: _handleOneTapCurlImport,
-                  onLongPress: () => _handleCurlExport(state.request),
-                  icon: const Icon(Icons.content_paste_go, size: 16, color: AppColors.primary),
-                  label: const Text(
-                    'cURL',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
+                  actions: [
+                    // Save to Collection
+                    IconButton(
+                      icon: const Icon(Icons.bookmark_add_outlined, size: 20, color: AppColors.primary),
+                      tooltip: 'Save to Collection',
+                      onPressed: () => SaveToCollectionDialog.show(context, state.request),
                     ),
-                  ),
+                    // 1-Tap cURL Import & Long-press Export
+                    Tooltip(
+                      message: 'Tap: Import cURL/URL from clipboard\nLong-press: Copy as cURL',
+                      child: TextButton.icon(
+                        onPressed: _handleOneTapCurlImport,
+                        onLongPress: () => _handleCurlExport(state.request),
+                        icon: const Icon(Icons.content_paste_go, size: 16, color: AppColors.primary),
+                        label: const Text(
+                          'cURL',
+                          style: TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 8),
-            ],
-          ),
           body: SafeArea(
             child: Column(
               children: [
-                // Environment Selector Sub-Bar
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const EnvironmentSelectorWidget(),
-                      const Text(
-                        'Variables: {{name}}',
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11,
-                          fontFamily: 'monospace',
+                // Environment Selector Sub-Bar (Hidden when keyboard is open to maximize editor room)
+                if (!isKeyboardOpen)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const EnvironmentSelectorWidget(),
+                        const Text(
+                          'Variables: {{name}}',
+                          style: TextStyle(
+                            color: AppColors.textMuted,
+                            fontSize: 11,
+                            fontFamily: 'monospace',
+                          ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
 
                 // 1. Top URL & Method & Send Bar
                 Padding(

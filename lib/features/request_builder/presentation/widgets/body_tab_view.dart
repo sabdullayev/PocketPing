@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../environments/presentation/widgets/variable_autocomplete_field.dart';
 import '../../domain/entities/request_body.dart';
+import 'fullscreen_body_editor_dialog.dart';
 
 class BodyTabView extends StatefulWidget {
   final RequestBody body;
@@ -57,71 +58,118 @@ class _BodyTabViewState extends State<BodyTabView> {
     widget.onContentChanged(newText);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Type Switcher Row (Scrollable to prevent any RenderFlex overflow on small screens)
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          child: Row(
-            children: [
-              Expanded(
-                child: SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      ...RequestBodyType.values.where((t) => t != RequestBodyType.formData).map((type) {
-                        final isSelected = widget.body.type == type;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6.0),
-                          child: ChoiceChip(
-                            visualDensity: VisualDensity.compact,
-                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            label: Text(
-                              type.label,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                color: isSelected ? Colors.white : AppColors.textSecondary,
-                              ),
-                            ),
-                            selected: isSelected,
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.surface,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
-                              side: BorderSide(
-                                color: isSelected ? AppColors.primary : AppColors.border,
-                              ),
-                            ),
-                            onSelected: (_) => widget.onTypeChanged(type),
-                          ),
-                        );
-                      }),
-                    ],
-                  ),
-                ),
-              ),
-              if (widget.body.type == RequestBodyType.json)
-                TextButton.icon(
-                  style: TextButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  onPressed: widget.onFormatJson,
-                  icon: const Icon(Icons.auto_fix_high, size: 14, color: AppColors.accent),
-                  label: const Text(
-                    'Beautify',
-                    style: TextStyle(color: AppColors.accent, fontSize: 12),
-                  ),
-                ),
-            ],
+  void _openFullscreen() {
+    FullscreenBodyEditorDialog.show(
+      context: context,
+      initialContent: _contentController.text,
+      type: widget.body.type,
+      onSaved: (val) {
+        _contentController.text = val;
+        widget.onContentChanged(val);
+      },
+      onFormatJson: widget.onFormatJson,
+    );
+  }
+
+  Widget _snippetChip(String label, String code) {
+    return InkWell(
+      onTap: () => _insertSnippet(code),
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: AppColors.card,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: AppColors.accent,
+            fontFamily: 'monospace',
+            fontWeight: FontWeight.bold,
+            fontSize: 11,
           ),
         ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+
+    return Column(
+      children: [
+        // Type Switcher Row (Only show when keyboard is closed to preserve maximum screen space for editor)
+        if (!isKeyboardOpen)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        ...RequestBodyType.values.where((t) => t != RequestBodyType.formData).map((type) {
+                          final isSelected = widget.body.type == type;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6.0),
+                            child: ChoiceChip(
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              label: Text(
+                                type.label,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                  color: isSelected ? Colors.white : AppColors.textSecondary,
+                                ),
+                              ),
+                              selected: isSelected,
+                              selectedColor: AppColors.primary,
+                              backgroundColor: AppColors.surface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                                side: BorderSide(
+                                  color: isSelected ? AppColors.primary : AppColors.border,
+                                ),
+                              ),
+                              onSelected: (_) => widget.onTypeChanged(type),
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+                  ),
+                ),
+                if (widget.body.type != RequestBodyType.none) ...[
+                  if (widget.body.type == RequestBodyType.json)
+                    TextButton.icon(
+                      style: TextButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        minimumSize: Size.zero,
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: widget.onFormatJson,
+                      icon: const Icon(Icons.auto_fix_high, size: 14, color: AppColors.accent),
+                      label: const Text(
+                        'Beautify',
+                        style: TextStyle(color: AppColors.accent, fontSize: 12),
+                      ),
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.fullscreen, color: AppColors.accent, size: 20),
+                    tooltip: 'Fullscreen Editor',
+                    onPressed: _openFullscreen,
+                  ),
+                ],
+              ],
+            ),
+          ),
 
         if (widget.body.type == RequestBodyType.none)
           const Expanded(
@@ -133,12 +181,12 @@ class _BodyTabViewState extends State<BodyTabView> {
             ),
           )
         else ...[
-          // Quick JSON Snippets
-          if (widget.body.type == RequestBodyType.json)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
-              child: Row(
-                children: [
+          // Quick JSON Snippets Toolbar
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            child: Row(
+              children: [
+                if (widget.body.type == RequestBodyType.json) ...[
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -153,6 +201,20 @@ class _BodyTabViewState extends State<BodyTabView> {
                         ],
                       ),
                     ),
+                  ),
+                ] else
+                  const Spacer(),
+                if (isKeyboardOpen) ...[
+                  if (widget.body.type == RequestBodyType.json)
+                    IconButton(
+                      icon: const Icon(Icons.auto_fix_high, size: 16, color: AppColors.accent),
+                      tooltip: 'Format JSON',
+                      onPressed: widget.onFormatJson,
+                    ),
+                  IconButton(
+                    icon: const Icon(Icons.fullscreen, size: 18, color: AppColors.accent),
+                    tooltip: 'Fullscreen Editor',
+                    onPressed: _openFullscreen,
                   ),
                   InkWell(
                     onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
@@ -170,12 +232,13 @@ class _BodyTabViewState extends State<BodyTabView> {
                     ),
                   ),
                 ],
-              ),
+              ],
             ),
-          // Editor Field
+          ),
+          // Editor Field (Expands to fill all remaining height without shrinking)
           Expanded(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               child: VariableAutocompleteField(
                 controller: _contentController,
                 maxLines: null,
@@ -194,6 +257,7 @@ class _BodyTabViewState extends State<BodyTabView> {
                       : 'Enter payload...',
                   filled: true,
                   fillColor: AppColors.surface,
+                  contentPadding: const EdgeInsets.all(12),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(10),
                     borderSide: const BorderSide(color: AppColors.border),
@@ -204,29 +268,6 @@ class _BodyTabViewState extends State<BodyTabView> {
           ),
         ],
       ],
-    );
-  }
-
-  Widget _snippetChip(String label, String code) {
-    return InkWell(
-      onTap: () => _insertSnippet(code),
-      borderRadius: BorderRadius.circular(6),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: AppColors.card,
-          borderRadius: BorderRadius.circular(6),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontFamily: 'monospace',
-            fontSize: 11,
-          ),
-        ),
-      ),
     );
   }
 }

@@ -138,9 +138,38 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
     );
   }
 
+  String? _getAuthHeader() {
+    for (final entry in widget.response.headers.entries) {
+      if (entry.key.toLowerCase() == 'www-authenticate') {
+        final val = entry.value.join(', ');
+        final match = RegExp(r'error_description="([^"]+)"').firstMatch(val);
+        if (match != null) {
+          return match.group(1);
+        }
+        return val;
+      }
+    }
+    return null;
+  }
+
   Widget _buildTreeTab() {
     if (_isFormatting) {
       return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+    if (widget.response.bodyString.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inbox_outlined, size: 36, color: AppColors.textMuted),
+            const SizedBox(height: 8),
+            Text(
+              widget.response.statusCode == 401 ? '401 Unauthorized: Empty body' : 'Empty response body',
+              style: const TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+          ],
+        ),
+      );
     }
     if (_parsedJson == null) {
       return const Center(
@@ -154,6 +183,75 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
     if (_isFormatting) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),
+      );
+    }
+
+    final authHeader = _getAuthHeader();
+    if (widget.response.statusCode == 401) {
+      return Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.statusClientError.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppColors.statusClientError.withValues(alpha: 0.5)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Row(
+                    children: [
+                      Icon(Icons.lock_clock, color: AppColors.statusClientError, size: 18),
+                      SizedBox(width: 8),
+                      Text(
+                        '401 Unauthorized (Auth Failed)',
+                        style: TextStyle(
+                          color: AppColors.statusClientError,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (authHeader != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      authHeader,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontSize: 12,
+                        fontFamily: 'monospace',
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            if (widget.response.bodyString.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: Text(
+                    'Server returned empty body.\nCheck token expiration or permissions above.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                  ),
+                ),
+              )
+            else
+              Expanded(
+                child: VirtualizedCodeViewer(
+                  content: widget.response.isJson ? _formattedJson : widget.response.bodyString,
+                  isJson: widget.response.isJson,
+                ),
+              ),
+          ],
+        ),
       );
     }
 

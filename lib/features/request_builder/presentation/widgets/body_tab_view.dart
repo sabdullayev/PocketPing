@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../environments/presentation/widgets/variable_autocomplete_field.dart';
 import '../../domain/entities/request_body.dart';
 
 class BodyTabView extends StatefulWidget {
@@ -134,7 +135,7 @@ class _BodyTabViewState extends State<BodyTabView> {
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: TextField(
+              child: VariableAutocompleteField(
                 controller: _contentController,
                 maxLines: null,
                 expands: true,

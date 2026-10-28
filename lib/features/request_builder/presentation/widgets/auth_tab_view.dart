@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../environments/presentation/widgets/variable_autocomplete_field.dart';
 
 class AuthTabView extends StatefulWidget {
   final String? bearerToken;
@@ -86,7 +87,7 @@ class _AuthTabViewState extends State<AuthTabView> {
             style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
           const SizedBox(height: 12),
-          TextField(
+          VariableAutocompleteField(
             controller: _controller,
             obscureText: _obscureText,
             maxLines: _obscureText ? 1 : 3,

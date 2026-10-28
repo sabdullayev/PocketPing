@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../environments/presentation/widgets/variable_autocomplete_field.dart';
 import '../../domain/entities/key_value_param.dart';
 
 class ParamsTabView extends StatelessWidget {
@@ -152,7 +153,7 @@ class _ParamRowState extends State<_ParamRow> {
           ),
           Expanded(
             flex: 2,
-            child: TextField(
+            child: VariableAutocompleteField(
               controller: _keyController,
               onChanged: (_) => _notifyChange(),
               style: TextStyle(
@@ -171,7 +172,7 @@ class _ParamRowState extends State<_ParamRow> {
           Container(width: 1, height: 24, color: AppColors.border),
           Expanded(
             flex: 3,
-            child: TextField(
+            child: VariableAutocompleteField(
               controller: _valueController,
               onChanged: (_) => _notifyChange(),
               style: TextStyle(

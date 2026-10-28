@@ -77,25 +77,30 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
 
   void _onChangeUrl(ChangeUrlEvent event, Emitter<RequestBuilderState> emit) {
     String input = event.url.trim();
+
+    if (input.isEmpty) {
+      // URL cleared: reset both URL and all query parameters cleanly
+      emit(state.copyWith(
+        request: state.request.copyWith(url: '', queryParams: const []),
+        clearInfo: true,
+        clearError: true,
+      ));
+      return;
+    }
+
     if (input.contains('?')) {
       final parts = input.split('?');
       final baseUrl = parts[0];
       final queryString = parts.sublist(1).join('?');
       final queryPairs = queryString.split('&');
 
-      final List<KeyValueParam> newParams = List.from(state.request.queryParams);
+      final List<KeyValueParam> newParams = [];
       for (final pair in queryPairs) {
         if (pair.isEmpty) continue;
         final kv = pair.split('=');
         final key = Uri.decodeQueryComponent(kv[0]);
         final value = kv.length > 1 ? Uri.decodeQueryComponent(kv[1]) : '';
-
-        final existingIdx = newParams.indexWhere((p) => p.key == key);
-        if (existingIdx >= 0) {
-          newParams[existingIdx] = newParams[existingIdx].copyWith(value: value, isEnabled: true);
-        } else {
-          newParams.add(KeyValueParam(key: key, value: value, isEnabled: true));
-        }
+        newParams.add(KeyValueParam(key: key, value: value, isEnabled: true));
       }
 
       emit(state.copyWith(

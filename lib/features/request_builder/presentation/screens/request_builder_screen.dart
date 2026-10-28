@@ -3,13 +3,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../collections/presentation/widgets/save_to_collection_dialog.dart';
-import '../../../environments/domain/entities/environment_variable.dart';
-import '../../../environments/presentation/bloc/environments_bloc.dart';
-import '../../../environments/presentation/bloc/environments_state.dart';
 import '../../../environments/presentation/widgets/environment_selector_widget.dart';
 import '../../../response_viewer/presentation/widgets/metrics_bar_widget.dart';
 import '../../../response_viewer/presentation/widgets/response_body_view.dart';
 import '../../../../core/utils/curl_parser.dart';
+import '../../../environments/presentation/widgets/variable_autocomplete_field.dart';
 import '../../domain/entities/http_request_entity.dart';
 import '../../domain/entities/request_body.dart';
 import '../bloc/request_builder_bloc.dart';
@@ -34,21 +32,12 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
   late final TextEditingController _urlController;
   final FocusNode _urlFocusNode = FocusNode();
 
-  String? _activeVariableQuery;
-  bool _isDoubleBrace = false;
-  bool _showSuggestions = false;
-
   @override
   void initState() {
     super.initState();
     _requestTabController = TabController(length: 4, vsync: this);
     final initialUrl = context.read<RequestBuilderBloc>().state.request.url;
     _urlController = TextEditingController(text: initialUrl);
-    _urlFocusNode.addListener(() {
-      if (!_urlFocusNode.hasFocus && _showSuggestions) {
-        setState(() => _showSuggestions = false);
-      }
-    });
   }
 
   @override
@@ -59,170 +48,85 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
     super.dispose();
   }
 
-  void _checkVariableTrigger(String text) {
-    final selection = _urlController.selection;
-    final cursorPosition = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
-    final textBefore = text.substring(0, cursorPosition);
+  Future<void> _handleOneTapCurlImport() async {
+    final clipData = await Clipboard.getData(Clipboard.kTextPlain);
+    final raw = clipData?.text?.trim() ?? '';
+    if (raw.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Clipboard is empty! Copy cURL or URL first.'),
+            backgroundColor: AppColors.statusClientError,
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return;
+    }
 
-    final match = RegExp(r'\{(\{)?([a-zA-Z0-9_]*)$').firstMatch(textBefore);
-    if (match != null) {
-      final isDouble = match.group(1) != null;
-      final query = match.group(2) ?? '';
-      setState(() {
-        _isDoubleBrace = isDouble;
-        _activeVariableQuery = query;
-        _showSuggestions = true;
-      });
-    } else {
-      if (_showSuggestions) {
-        setState(() {
-          _showSuggestions = false;
-          _activeVariableQuery = null;
-        });
+    // 1. Direct cURL check
+    if (CurlParser.isCurl(raw)) {
+      if (!mounted) return;
+      context.read<RequestBuilderBloc>().add(ImportCurlEvent(raw));
+      return;
+    }
+
+    // 2. Direct URL check (e.g. user copied https://api.biznex.uz/...)
+    if (raw.startsWith('http://') || raw.startsWith('https://')) {
+      if (!mounted) return;
+      context.read<RequestBuilderBloc>().add(ChangeUrlEvent(raw));
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('URL imported from clipboard!'),
+          backgroundColor: AppColors.statusSuccess,
+          behavior: SnackBarBehavior.floating,
+          duration: Duration(seconds: 1),
+        ),
+      );
+      return;
+    }
+
+    // 3. Embedded cURL inside text/markdown
+    final curlIdx = raw.toLowerCase().indexOf('curl ');
+    if (curlIdx >= 0) {
+      final sub = raw.substring(curlIdx).trim();
+      if (CurlParser.isCurl(sub)) {
+        if (!mounted) return;
+        context.read<RequestBuilderBloc>().add(ImportCurlEvent(sub));
+        return;
       }
     }
-  }
 
-  void _insertVariableSuggestion(String varKey) {
-    final text = _urlController.text;
-    final selection = _urlController.selection;
-    final cursorPosition = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
-    final textBefore = text.substring(0, cursorPosition);
-    final textAfter = text.substring(cursorPosition);
+    // 4. Try parsing anyway
+    final parsed = CurlParser.parse(raw);
+    if (parsed != null) {
+      if (!mounted) return;
+      context.read<RequestBuilderBloc>().add(ImportCurlEvent(raw));
+      return;
+    }
 
-    final match = RegExp(r'\{(\{)?([a-zA-Z0-9_]*)$').firstMatch(textBefore);
-    if (match != null) {
-      final startIndex = match.start;
-      final inserted = _isDoubleBrace ? '{{$varKey}}' : '{$varKey}';
-      final newText = textBefore.substring(0, startIndex) + inserted + textAfter;
-      final newCursorPosition = startIndex + inserted.length;
-
-      _urlController.value = TextEditingValue(
-        text: newText,
-        selection: TextSelection.collapsed(offset: newCursorPosition),
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Clipboard text is not a valid cURL or URL:\n${raw.length > 50 ? "${raw.substring(0, 50)}..." : raw}'),
+          backgroundColor: AppColors.methodDelete,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 3),
+        ),
       );
-      context.read<RequestBuilderBloc>().add(ChangeUrlEvent(newText));
-      setState(() {
-        _showSuggestions = false;
-        _activeVariableQuery = null;
-      });
     }
   }
 
-  Future<void> _showCurlDialog(BuildContext context, HttpRequestEntity currentRequest) async {
-    final clipData = await Clipboard.getData(Clipboard.kTextPlain);
-    final clipText = clipData?.text?.trim() ?? '';
-    final initialText = CurlParser.isCurl(clipText) ? clipText : '';
-    final controller = TextEditingController(text: initialText);
-
-    if (!context.mounted) return;
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setModalState) {
-          return Padding(
-            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: const BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Row(
-                        children: [
-                          Icon(Icons.terminal, color: AppColors.primary, size: 20),
-                          SizedBox(width: 8),
-                          Text(
-                            'cURL Import & Export',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.close, color: AppColors.textSecondary),
-                        onPressed: () => Navigator.pop(ctx),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextField(
-                    controller: controller,
-                    maxLines: 5,
-                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
-                    decoration: const InputDecoration(
-                      hintText: 'Paste cURL command here (e.g. curl -X GET "https://api...")',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () async {
-                            final clip = await Clipboard.getData(Clipboard.kTextPlain);
-                            if (clip?.text != null && clip!.text!.trim().isNotEmpty) {
-                              setModalState(() {
-                                controller.text = clip.text!.trim();
-                              });
-                            }
-                          },
-                          icon: const Icon(Icons.paste, size: 16),
-                          label: const Text('Paste'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                          ),
-                          onPressed: () {
-                            final cmd = controller.text.trim();
-                            if (cmd.isNotEmpty) {
-                              context.read<RequestBuilderBloc>().add(ImportCurlEvent(cmd));
-                              Navigator.pop(ctx);
-                            }
-                          },
-                          icon: const Icon(Icons.download, size: 16),
-                          label: const Text('Import'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  TextButton.icon(
-                    onPressed: () {
-                      final generated = CurlParser.toCurl(currentRequest);
-                      Clipboard.setData(ClipboardData(text: generated));
-                      Navigator.pop(ctx);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Request copied to clipboard as cURL!'),
-                          backgroundColor: AppColors.statusSuccess,
-                          duration: Duration(seconds: 2),
-                        ),
-                      );
-                    },
-                    icon: const Icon(Icons.copy, size: 16, color: AppColors.accent),
-                    label: const Text('Copy Current Request as cURL', style: TextStyle(color: AppColors.accent)),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+  void _handleCurlExport(HttpRequestEntity request) {
+    final cmd = CurlParser.toCurl(request);
+    Clipboard.setData(ClipboardData(text: cmd));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Request copied as cURL to clipboard!'),
+        backgroundColor: AppColors.statusSuccess,
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(seconds: 2),
       ),
     );
   }
@@ -290,16 +194,20 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                 tooltip: 'Save to Collection',
                 onPressed: () => SaveToCollectionDialog.show(context, state.request),
               ),
-              // Killer feature: 1-tap cURL import & export
-              TextButton.icon(
-                onPressed: () => _showCurlDialog(context, state.request),
-                icon: const Icon(Icons.terminal, size: 16, color: AppColors.primary),
-                label: const Text(
-                  'cURL',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 13,
+              // 1-Tap cURL Import & Long-press Export
+              Tooltip(
+                message: 'Tap: Import cURL/URL from clipboard\nLong-press: Copy as cURL',
+                child: TextButton.icon(
+                  onPressed: _handleOneTapCurlImport,
+                  onLongPress: () => _handleCurlExport(state.request),
+                  icon: const Icon(Icons.content_paste_go, size: 16, color: AppColors.primary),
+                  label: const Text(
+                    'cURL',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
                   ),
                 ),
               ),
@@ -339,7 +247,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                       ),
                       const SizedBox(width: 8),
                       Expanded(
-                        child: TextField(
+                        child: VariableAutocompleteField(
                           controller: _urlController,
                           focusNode: _urlFocusNode,
                           keyboardType: TextInputType.url,
@@ -349,7 +257,6 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                             bloc.add(const SendRequestEvent());
                           },
                           onChanged: (val) {
-                            _checkVariableTrigger(val);
                             bloc.add(ChangeUrlEvent(val));
                           },
                           style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
@@ -374,7 +281,6 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                                         selection: TextSelection.collapsed(offset: cursor + 1),
                                       );
                                       _urlFocusNode.requestFocus();
-                                      _checkVariableTrigger(newText);
                                     },
                                     borderRadius: BorderRadius.circular(4),
                                     child: Container(
@@ -400,10 +306,6 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                                       onTap: () {
                                         _urlController.clear();
                                         bloc.add(const ChangeUrlEvent(''));
-                                        setState(() {
-                                          _showSuggestions = false;
-                                          _activeVariableQuery = null;
-                                        });
                                       },
                                       borderRadius: BorderRadius.circular(12),
                                       child: const Padding(
@@ -446,10 +348,6 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                     ],
                   ),
                 ),
-
-                // Variable autocomplete suggestions dropdown (IntelliSense)
-                if (_showSuggestions && _urlFocusNode.hasFocus)
-                  _buildVariableSuggestionsPanel(context),
 
                 // 2. Request Configuration Tabs (Params, Auth, Headers, Body)
                 Container(
@@ -589,131 +487,6 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
           ),
         );
       },
-    );
-  }
-
-  Widget _buildVariableSuggestionsPanel(BuildContext context) {
-    final envState = context.watch<EnvironmentsBloc>().state;
-    List<EnvironmentVariable> availableVars = [];
-    if (envState is EnvironmentsLoadedState && envState.selectedEnvironment != null) {
-      availableVars = envState.selectedEnvironment!.variables
-          .where((v) => v.isEnabled && v.key.trim().isNotEmpty)
-          .toList();
-    }
-
-    final query = _activeVariableQuery ?? '';
-    final matching = availableVars.where((v) {
-      if (query.isEmpty) return true;
-      return v.key.toLowerCase().contains(query.toLowerCase());
-    }).toList();
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        color: AppColors.card,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.6), width: 1.5),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.4),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            child: Row(
-              children: [
-                const Icon(Icons.auto_awesome, size: 14, color: AppColors.accent),
-                const SizedBox(width: 6),
-                const Text(
-                  'VARIABLES AUTOCOMPLETE',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-                const Spacer(),
-                const Text(
-                  'Tap to insert',
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 10),
-                ),
-              ],
-            ),
-          ),
-          const Divider(height: 1, color: AppColors.border),
-          if (matching.isEmpty)
-            Padding(
-              padding: const EdgeInsets.all(12),
-              child: Text(
-                availableVars.isEmpty
-                    ? 'No variables defined in active environment'
-                    : 'No variables matching "$query"',
-                style: const TextStyle(color: AppColors.textMuted, fontSize: 12),
-              ),
-            )
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 140),
-              child: ListView.separated(
-                shrinkWrap: true,
-                padding: EdgeInsets.zero,
-                itemCount: matching.length,
-                separatorBuilder: (_, _) => const Divider(height: 1, color: AppColors.border),
-                itemBuilder: (context, index) {
-                  final v = matching[index];
-                  return InkWell(
-                    onTap: () => _insertVariableSuggestion(v.key),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: AppColors.accent.withValues(alpha: 0.15),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              _isDoubleBrace ? '{{${v.key}}}' : '{${v.key}}',
-                              style: const TextStyle(
-                                color: AppColors.accent,
-                                fontFamily: 'monospace',
-                                fontWeight: FontWeight.bold,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              v.value,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                color: AppColors.textSecondary,
-                                fontFamily: 'monospace',
-                                fontSize: 11,
-                              ),
-                            ),
-                          ),
-                          const Icon(Icons.keyboard_return, size: 14, color: AppColors.textMuted),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
     );
   }
 }

@@ -61,45 +61,62 @@ class _BodyTabViewState extends State<BodyTabView> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Type Switcher Row
+        // Type Switcher Row (Scrollable to prevent any RenderFlex overflow on small screens)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
           child: Row(
             children: [
-              ...RequestBodyType.values.where((t) => t != RequestBodyType.formData).map((type) {
-                final isSelected = widget.body.type == type;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 8.0),
-                  child: ChoiceChip(
-                    label: Text(
-                      type.label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
-                      ),
-                    ),
-                    selected: isSelected,
-                    selectedColor: AppColors.primary,
-                    backgroundColor: AppColors.surface,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: isSelected ? AppColors.primary : AppColors.border,
-                      ),
-                    ),
-                    onSelected: (_) => widget.onTypeChanged(type),
+              Expanded(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      ...RequestBodyType.values.where((t) => t != RequestBodyType.formData).map((type) {
+                        final isSelected = widget.body.type == type;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 6.0),
+                          child: ChoiceChip(
+                            visualDensity: VisualDensity.compact,
+                            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                            labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            label: Text(
+                              type.label,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                                color: isSelected ? Colors.white : AppColors.textSecondary,
+                              ),
+                            ),
+                            selected: isSelected,
+                            selectedColor: AppColors.primary,
+                            backgroundColor: AppColors.surface,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                              side: BorderSide(
+                                color: isSelected ? AppColors.primary : AppColors.border,
+                              ),
+                            ),
+                            onSelected: (_) => widget.onTypeChanged(type),
+                          ),
+                        );
+                      }),
+                    ],
                   ),
-                );
-              }),
-              const Spacer(),
+                ),
+              ),
               if (widget.body.type == RequestBodyType.json)
                 TextButton.icon(
+                  style: TextButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
                   onPressed: widget.onFormatJson,
-                  icon: const Icon(Icons.auto_fix_high, size: 16, color: AppColors.accent),
+                  icon: const Icon(Icons.auto_fix_high, size: 14, color: AppColors.accent),
                   label: const Text(
                     'Beautify',
-                    style: TextStyle(color: AppColors.accent, fontSize: 13),
+                    style: TextStyle(color: AppColors.accent, fontSize: 12),
                   ),
                 ),
             ],
@@ -119,15 +136,39 @@ class _BodyTabViewState extends State<BodyTabView> {
           // Quick JSON Snippets
           if (widget.body.type == RequestBodyType.json)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
               child: Row(
                 children: [
-                  const Text('Quick: ', style: TextStyle(color: AppColors.textMuted, fontSize: 12)),
-                  _snippetChip('{}', '{\n  \n}'),
-                  const SizedBox(width: 6),
-                  _snippetChip('[]', '[\n  \n]'),
-                  const SizedBox(width: 6),
-                  _snippetChip('"key": "val"', '"key": "value"'),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          const Text('Quick: ', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                          _snippetChip('{}', '{\n  \n}'),
+                          const SizedBox(width: 6),
+                          _snippetChip('[]', '[\n  \n]'),
+                          const SizedBox(width: 6),
+                          _snippetChip('"key": "val"', '"key": "value"'),
+                        ],
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+                    borderRadius: BorderRadius.circular(4),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.keyboard_hide, size: 14, color: AppColors.textMuted),
+                          SizedBox(width: 4),
+                          Text('Done', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
+                        ],
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),

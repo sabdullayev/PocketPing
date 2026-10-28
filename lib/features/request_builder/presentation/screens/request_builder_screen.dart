@@ -400,7 +400,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                 ),
 
                 // 3. Request Configuration Tab Body
-                // If keyboard is open, give full available space to Request tab so inputs aren't squished!
+                // When keyboard is open, give 100% of available space to the input tab so the editor never gets squished
                 Expanded(
                   flex: isKeyboardOpen ? 1 : 3,
                   child: TabBarView(
@@ -434,11 +434,12 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                   ),
                 ),
 
-                // 4. Response Section (Always visible if response is present; only hide placeholder when keyboard is open)
-                if (!isKeyboardOpen || state.response != null) ...[
+                // 4. Response Section
+                // When keyboard is open, hide response section completely so inputs have full height and never disappear!
+                if (!isKeyboardOpen) ...[
                   const Divider(height: 1, color: AppColors.border),
                   Expanded(
-                    flex: isKeyboardOpen ? 3 : 4,
+                    flex: 4,
                     child: Container(
                       color: AppColors.background,
                       child: state.response == null

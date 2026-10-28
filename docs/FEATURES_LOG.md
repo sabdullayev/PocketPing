@@ -28,7 +28,12 @@
     - Удаление папок и отдельных запросов.
   - **Главная навигация (`features/home`)**:
     - Нижняя панель навигации `MainNavigationShell` (Material 3) с вкладками `Ping`, `History`, `Collections`.
-- [ ] **Этап 3 (Киллер-фичи: Переменные окружения):** Поддержка переменных окружения `{{base_url}}`, `{{token}}` с глобальным переключателем Dev/Staging/Prod.
+- [x] **Этап 3 (Киллер-фичи: Переменные окружения / Environments):**
+  - Поддержка переменных окружения `{{base_url}}`, `{{token}}`, `{{user_id}}` и др.
+  - Хранение в Hive (`environments_box`) с предзаполненными окружениями (`Development` и `Production`).
+  - Юзкейс `SubstituteEnvVariablesUseCase` для автоматической замены переменных во всех слоях запроса (URL, Query, Headers, Bearer, Body) без модификации исходного шаблона в редакторе.
+  - Компоненты UI: `EnvironmentSelectorWidget` (активный бейдж вверху экрана) и `EnvironmentsManagerDialog` (редактор окружений и переменных).
+  - Unit-тесты подстановки переменных (`test/env_variables_test.dart`).
 - [ ] **Этап 4 (Продвинутый уровень: JSON Tree & Health Check):** 
   - Интерактивное сворачиваемое дерево JSON (JSON Tree View) с копированием пути к полю (напр. `data.users[0].id`).
   - Фоновый Health Check серверов через `workmanager` + локальные пуш-уведомления при сбоях.
@@ -37,13 +42,17 @@
 
 ## Журнал изменений (Changelog)
 
-### [2026-10-27] — Этап 2: Локальная БД (Hive), История запросов, Коллекции и Главная навигация
-- **Статус:** Выполнено, протестировано (`flutter analyze` — 0 issues, `flutter test` — 4 passed).
+### [2026-10-27] — Этап 3: Переменные окружения (Environments)
+- **Статус:** Выполнено, протестировано (`flutter analyze` — 0 issues, `flutter test` — 6 passed).
 - **Ключевые файлы:**
-  - `lib/features/history/` — сущности, модели (`HistoryItemModel`), Hive-источник `HistoryLocalDataSourceImpl`, репозиторий, юзкейсы, BLoC и экран `HistoryScreen`.
-  - `lib/features/collections/` — сущности, модели (`CollectionModel`), Hive-источник `CollectionsLocalDataSourceImpl`, репозиторий, юзкейсы, BLoC, экран `CollectionsScreen` и модальное окно `SaveToCollectionDialog`.
-  - `lib/features/home/presentation/screens/main_navigation_shell.dart` — нижняя навигационная панель (`NavigationBar`).
-  - `lib/core/di/injection_container.dart` — регистрация Hive, репозиториев и BLoC'ов.
+  - `lib/features/environments/` — сущности `EnvironmentEntity` и `EnvironmentVariable`, Hive-источник `EnvironmentsLocalDataSourceImpl`, юзкейсы `SubstituteEnvVariablesUseCase`, BLoC `EnvironmentsBloc`.
+  - `lib/features/environments/presentation/widgets/` — `EnvironmentSelectorWidget` и `EnvironmentsManagerDialog`.
+  - `lib/features/request_builder/presentation/bloc/request_builder_bloc.dart` — внедрение авто-подстановки переменных окружения перед сетевым вызовом.
+  - `test/env_variables_test.dart` — тесты юзкейса замены переменных.
+
+### [2026-10-27] — Этап 2: Локальная БД (Hive), История запросов, Коллекции и Главная навигация
+- **Статус:** Выполнено, протестировано.
+- Добавлена история запросов, коллекции, папки и нижняя панель навигации `MainNavigationShell`.
 
 ### [2026-10-27] — Этап 1: Сетевое ядро, Request Builder, cURL-импорт и Response Viewer
 - **Статус:** Выполнено, протестировано.
@@ -51,4 +60,4 @@
 
 ### [2026-10-27] — Этап 0: Инициализация проекта и Clean Architecture структура
 - **Статус:** Выполнено.
-- Инициализирован проект Flutter, развернуты слои `core/` и `features/`, написана документация `ARCHITECTURE.md` и `FEATURES_LOG.md`.
+- Инициализирован проект Flutter, созданы папки Clean Architecture, написана документация `ARCHITECTURE.md` и `FEATURES_LOG.md`.

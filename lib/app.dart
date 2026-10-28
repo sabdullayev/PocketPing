@@ -3,6 +3,8 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection_container.dart';
 import 'core/theme/app_theme.dart';
 import 'features/collections/presentation/bloc/collections_bloc.dart';
+import 'features/environments/presentation/bloc/environments_bloc.dart';
+import 'features/environments/presentation/bloc/environments_event.dart';
 import 'features/history/presentation/bloc/history_bloc.dart';
 import 'features/home/presentation/screens/main_navigation_shell.dart';
 import 'features/request_builder/presentation/bloc/request_builder_bloc.dart';
@@ -14,6 +16,9 @@ class PocketPingApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiBlocProvider(
       providers: [
+        BlocProvider<EnvironmentsBloc>(
+          create: (_) => sl<EnvironmentsBloc>()..add(const LoadEnvironmentsEvent()),
+        ),
         BlocProvider<RequestBuilderBloc>(
           create: (_) => sl<RequestBuilderBloc>(),
         ),

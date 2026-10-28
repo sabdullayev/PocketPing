@@ -6,6 +6,12 @@ import '../../features/collections/data/repositories/collections_repository_impl
 import '../../features/collections/domain/repositories/collections_repository.dart';
 import '../../features/collections/domain/usecases/collections_usecases.dart';
 import '../../features/collections/presentation/bloc/collections_bloc.dart';
+import '../../features/environments/data/datasources/environments_local_datasource.dart';
+import '../../features/environments/data/repositories/environments_repository_impl.dart';
+import '../../features/environments/domain/repositories/environments_repository.dart';
+import '../../features/environments/domain/usecases/environments_usecases.dart';
+import '../../features/environments/domain/usecases/substitute_env_variables_usecase.dart';
+import '../../features/environments/presentation/bloc/environments_bloc.dart';
 import '../../features/history/data/datasources/history_local_datasource.dart';
 import '../../features/history/data/repositories/history_repository_impl.dart';
 import '../../features/history/domain/repositories/history_repository.dart';
@@ -97,11 +103,44 @@ Future<void> initDependencies({String? hivePath}) async {
     ),
   );
 
-  // 6. Request Builder Bloc (injected with SaveHistoryItemUseCase)
+  // 6. Environments Feature
+  sl.registerLazySingleton<EnvironmentsLocalDataSource>(
+    () => EnvironmentsLocalDataSourceImpl(),
+  );
+  sl.registerLazySingleton<EnvironmentsRepository>(
+    () => EnvironmentsRepositoryImpl(localDataSource: sl()),
+  );
+  sl.registerLazySingleton<GetEnvironmentsUseCase>(
+    () => GetEnvironmentsUseCase(sl()),
+  );
+  sl.registerLazySingleton<SaveEnvironmentUseCase>(
+    () => SaveEnvironmentUseCase(sl()),
+  );
+  sl.registerLazySingleton<DeleteEnvironmentUseCase>(
+    () => DeleteEnvironmentUseCase(sl()),
+  );
+  sl.registerLazySingleton<SelectEnvironmentUseCase>(
+    () => SelectEnvironmentUseCase(sl()),
+  );
+  sl.registerLazySingleton<SubstituteEnvVariablesUseCase>(
+    () => SubstituteEnvVariablesUseCase(),
+  );
+  sl.registerLazySingleton<EnvironmentsBloc>(
+    () => EnvironmentsBloc(
+      getEnvironmentsUseCase: sl(),
+      saveEnvironmentUseCase: sl(),
+      deleteEnvironmentUseCase: sl(),
+      selectEnvironmentUseCase: sl(),
+    ),
+  );
+
+  // 7. Request Builder Bloc
   sl.registerFactory<RequestBuilderBloc>(
     () => RequestBuilderBloc(
       executeRequestUseCase: sl(),
       saveHistoryItemUseCase: sl(),
+      substituteEnvVariablesUseCase: sl(),
+      environmentsBloc: sl(),
     ),
   );
 }

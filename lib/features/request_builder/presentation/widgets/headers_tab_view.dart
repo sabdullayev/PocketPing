@@ -47,11 +47,16 @@ class HeadersTabView extends StatelessWidget {
           ),
         ),
         if (headers.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              'No custom headers configured. Tap "+ Add Header"',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          const Expanded(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'No custom headers configured. Tap "+ Add Header"',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                ),
+              ),
             ),
           )
         else

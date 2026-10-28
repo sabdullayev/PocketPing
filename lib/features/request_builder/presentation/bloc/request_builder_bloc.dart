@@ -2,8 +2,12 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/services/json_isolate_service.dart';
 import '../../../../core/utils/curl_parser.dart';
+import '../../../environments/domain/usecases/substitute_env_variables_usecase.dart';
+import '../../../environments/presentation/bloc/environments_bloc.dart';
+import '../../../environments/presentation/bloc/environments_state.dart';
 import '../../../history/domain/entities/history_item_entity.dart';
 import '../../../history/domain/usecases/history_usecases.dart';
+import '../../domain/entities/http_request_entity.dart';
 import '../../domain/entities/key_value_param.dart';
 import '../../domain/usecases/execute_request_usecase.dart';
 import 'request_builder_event.dart';
@@ -12,10 +16,14 @@ import 'request_builder_state.dart';
 class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> {
   final ExecuteRequestUseCase executeRequestUseCase;
   final SaveHistoryItemUseCase? saveHistoryItemUseCase;
+  final SubstituteEnvVariablesUseCase? substituteEnvVariablesUseCase;
+  final EnvironmentsBloc? environmentsBloc;
 
   RequestBuilderBloc({
     required this.executeRequestUseCase,
     this.saveHistoryItemUseCase,
+    this.substituteEnvVariablesUseCase,
+    this.environmentsBloc,
   }) : super(RequestBuilderState.initial()) {
     on<ChangeMethodEvent>(_onChangeMethod);
     on<ChangeUrlEvent>(_onChangeUrl);
@@ -229,15 +237,24 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
       clearInfo: true,
     ));
 
-    final response = await executeRequestUseCase(state.request);
+    // Substitute {{variables}} using active environment if configured
+    HttpRequestEntity effectiveRequest = state.request;
+    if (substituteEnvVariablesUseCase != null && environmentsBloc != null) {
+      final envState = environmentsBloc!.state;
+      if (envState is EnvironmentsLoadedState && envState.selectedEnvironment != null) {
+        effectiveRequest = substituteEnvVariablesUseCase!(state.request, envState.selectedEnvironment);
+      }
+    }
 
-    // Automatically persist to history if use case available
+    final response = await executeRequestUseCase(effectiveRequest);
+
+    // Automatically persist to history
     if (saveHistoryItemUseCase != null) {
       try {
         await saveHistoryItemUseCase!(
           HistoryItemEntity(
             id: const Uuid().v4(),
-            request: state.request,
+            request: effectiveRequest,
             response: response,
             executedAt: DateTime.now(),
           ),

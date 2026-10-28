@@ -47,11 +47,16 @@ class ParamsTabView extends StatelessWidget {
           ),
         ),
         if (queryParams.isEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 24),
-            child: Text(
-              'No query parameters. Tap "+ Add Param" or type in URL (?key=val)',
-              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          const Expanded(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: Text(
+                  'No query parameters. Tap "+ Add Param" or type in URL (?key=val)',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                ),
+              ),
             ),
           )
         else

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../collections/presentation/widgets/save_to_collection_dialog.dart';
+import '../../../environments/presentation/widgets/environment_selector_widget.dart';
 import '../../../response_viewer/presentation/widgets/metrics_bar_widget.dart';
 import '../../../response_viewer/presentation/widgets/response_body_view.dart';
 import '../../domain/entities/request_body.dart';
@@ -136,6 +137,25 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
           body: SafeArea(
             child: Column(
               children: [
+                // Environment Selector Sub-Bar
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const EnvironmentSelectorWidget(),
+                      const Text(
+                        'Variables: {{name}}',
+                        style: TextStyle(
+                          color: AppColors.textMuted,
+                          fontSize: 11,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
                 // 1. Top URL & Method & Send Bar
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),

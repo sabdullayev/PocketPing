@@ -29,6 +29,7 @@ class _MonitorScreenState extends State<MonitorScreen> {
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
+          scrollable: true,
           backgroundColor: AppColors.card,
           title: const Row(
             children: [

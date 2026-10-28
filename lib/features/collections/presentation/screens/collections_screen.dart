@@ -31,6 +31,7 @@ class _CollectionsScreenState extends State<CollectionsScreen> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.card,
         title: const Text('New Collection Folder'),
         content: Column(

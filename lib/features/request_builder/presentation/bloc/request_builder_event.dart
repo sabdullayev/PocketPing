@@ -122,6 +122,10 @@ class ImportCurlEvent extends RequestBuilderEvent {
   List<Object?> get props => [curl];
 }
 
+class ClearMessagesEvent extends RequestBuilderEvent {
+  const ClearMessagesEvent();
+}
+
 class SendRequestEvent extends RequestBuilderEvent {
   const SendRequestEvent();
 }

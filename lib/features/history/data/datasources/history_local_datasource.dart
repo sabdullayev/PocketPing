@@ -23,8 +23,9 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   Future<List<HistoryItemModel>> getHistory() async {
     final box = await _getBox();
     final List<HistoryItemModel> items = [];
-    for (int i = box.length - 1; i >= 0; i--) {
-      final raw = box.getAt(i);
+    final values = box.values.toList();
+    for (int i = values.length - 1; i >= 0; i--) {
+      final raw = values[i];
       if (raw is Map) {
         try {
           items.add(HistoryItemModel.fromMap(raw));
@@ -37,14 +38,15 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   @override
   Future<void> saveHistoryItem(HistoryItemModel item) async {
     final box = await _getBox();
-    // Add new item
-    await box.add(item.toMap());
+    // Use put with unique id so duplicate calls are idempotent
+    await box.put(item.id, item.toMap());
 
     // Prune old history if exceeding max count
     if (box.length > maxHistoryCount) {
       final excess = box.length - maxHistoryCount;
-      for (int i = 0; i < excess; i++) {
-        await box.deleteAt(0);
+      final keys = box.keys.take(excess).toList();
+      for (final key in keys) {
+        await box.delete(key);
       }
     }
   }
@@ -52,11 +54,16 @@ class HistoryLocalDataSourceImpl implements HistoryLocalDataSource {
   @override
   Future<void> deleteHistoryItem(String id) async {
     final box = await _getBox();
-    for (int i = 0; i < box.length; i++) {
-      final raw = box.getAt(i);
-      if (raw is Map && raw['id'] == id) {
-        await box.deleteAt(i);
-        break;
+    if (box.containsKey(id)) {
+      await box.delete(id);
+    } else {
+      // Fallback for any legacy entries keyed by index
+      for (final key in box.keys) {
+        final val = box.get(key);
+        if (val is Map && val['id'] == id) {
+          await box.delete(key);
+          break;
+        }
       }
     }
   }

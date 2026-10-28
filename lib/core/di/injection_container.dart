@@ -67,7 +67,7 @@ Future<void> initDependencies({String? hivePath}) async {
   sl.registerLazySingleton<ClearHistoryUseCase>(
     () => ClearHistoryUseCase(sl()),
   );
-  sl.registerFactory<HistoryBloc>(
+  sl.registerLazySingleton<HistoryBloc>(
     () => HistoryBloc(
       getHistoryUseCase: sl(),
       saveHistoryItemUseCase: sl(),
@@ -177,6 +177,7 @@ Future<void> initDependencies({String? hivePath}) async {
       saveHistoryItemUseCase: sl(),
       substituteEnvVariablesUseCase: sl(),
       environmentsBloc: sl(),
+      historyBloc: sl(),
     ),
   );
 }

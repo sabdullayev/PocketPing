@@ -50,8 +50,8 @@ class _AuthTabViewState extends State<AuthTabView> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -76,16 +76,16 @@ class _AuthTabViewState extends State<AuthTabView> {
               ),
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           const Text(
             'The token will be sent automatically as header: Authorization: Bearer <token>',
             style: TextStyle(color: AppColors.textMuted, fontSize: 12),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 12),
           TextField(
             controller: _controller,
             obscureText: _obscureText,
-            maxLines: _obscureText ? 1 : 4,
+            maxLines: _obscureText ? 1 : 3,
             style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
             onChanged: widget.onTokenChanged,
             decoration: InputDecoration(

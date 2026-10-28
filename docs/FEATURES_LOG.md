@@ -51,6 +51,13 @@
 
 ## Журнал изменений (Changelog)
 
+### [2026-10-28] — Исправление UI/UX, клавиатуры и синхронизации истории
+- **Статус:** Выполнено, протестировано на эмуляторе и реальном телефоне (`flutter analyze` — 0 issues, `flutter test` — 7 passed).
+- **Исправленные баги и улучшения:**
+  - **Клавиатура и оверфлоу в полях ввода:** Устранен баг `BOTTOM OVERFLOWED BY 48 PIXELS` в `AuthTabView`, обернуты диалоги `SaveToCollectionDialog`, `EnvironmentsManagerDialog`, `CollectionsScreen`, `MonitorScreen` в `scrollable: true` и `Padding` с учётом клавиатуры `View.of(context).viewInsets.bottom`. Секция ответа автоматически скрывается при вводе с клавиатуры, давая всё пространство полям ввода.
+  - **Синхронизация истории запросов:** `HistoryBloc` зарегистрирован как синглтон и внедрен в `RequestBuilderBloc`. При успешном выполнении запроса `AddHistoryItemEvent` моментально обновляет стейт в памяти, а при переключении вкладок в `MainNavigationShell` вызывается `LoadHistoryEvent()`. В `HistoryLocalDataSourceImpl` перешли на идемпотентное сохранение по ID `box.put(item.id, item.toMap())`.
+  - **Устранение фантомной ошибки cURL:** Добавлен `ClearMessagesEvent()` в `RequestBuilderBloc`, очищающий `errorMessage` и `infoMessage` сразу после отображения SnackBar. Событие смены типа тела запроса (`ChangeBodyTypeEvent`) теперь корректно сбрасывает старые ошибки.
+
 ### [2026-10-28] — Этап 4: Интерактивное дерево JSON (JSON Tree) и Фоновый Health Check
 - **Статус:** Выполнено, протестировано (`flutter analyze` — 0 issues, `flutter test` — 6 passed).
 - **Ключевые файлы:**

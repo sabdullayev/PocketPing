@@ -6,6 +6,7 @@ import 'features/collections/presentation/bloc/collections_bloc.dart';
 import 'features/environments/presentation/bloc/environments_bloc.dart';
 import 'features/environments/presentation/bloc/environments_event.dart';
 import 'features/history/presentation/bloc/history_bloc.dart';
+import 'features/history/presentation/bloc/history_event.dart';
 import 'features/home/presentation/screens/main_navigation_shell.dart';
 import 'features/monitor/presentation/bloc/monitor_bloc.dart';
 import 'features/request_builder/presentation/bloc/request_builder_bloc.dart';
@@ -24,7 +25,7 @@ class PocketPingApp extends StatelessWidget {
           create: (_) => sl<RequestBuilderBloc>(),
         ),
         BlocProvider<HistoryBloc>(
-          create: (_) => sl<HistoryBloc>(),
+          create: (_) => sl<HistoryBloc>()..add(const LoadHistoryEvent()),
         ),
         BlocProvider<CollectionsBloc>(
           create: (_) => sl<CollectionsBloc>(),

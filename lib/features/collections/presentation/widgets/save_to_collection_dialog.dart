@@ -48,6 +48,7 @@ class _SaveToCollectionDialogState extends State<SaveToCollectionDialog> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.card,
         title: const Text('New Folder / Collection'),
         content: TextField(
@@ -78,6 +79,7 @@ class _SaveToCollectionDialogState extends State<SaveToCollectionDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
+      scrollable: true,
       backgroundColor: AppColors.card,
       title: const Row(
         children: [

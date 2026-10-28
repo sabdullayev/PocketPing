@@ -65,6 +65,8 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
 
   @override
   Widget build(BuildContext context) {
+    final isKeyboardOpen = View.of(context).viewInsets.bottom > 0;
+
     return BlocConsumer<RequestBuilderBloc, RequestBuilderState>(
       listener: (context, state) {
         if (_urlController.text != state.request.url) {
@@ -77,8 +79,11 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
               content: Text(state.errorMessage!),
               backgroundColor: AppColors.methodDelete,
               behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
             ),
           );
+          // Immediately wipe message from state so it never repeats on next clicks
+          context.read<RequestBuilderBloc>().add(const ClearMessagesEvent());
         }
 
         if (state.infoMessage != null) {
@@ -87,8 +92,10 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
               content: Text(state.infoMessage!),
               backgroundColor: AppColors.statusSuccess,
               behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 2),
             ),
           );
+          context.read<RequestBuilderBloc>().add(const ClearMessagesEvent());
         }
       },
       builder: (context, state) {
@@ -96,6 +103,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
         final request = state.request;
 
         return Scaffold(
+          resizeToAvoidBottomInset: true,
           appBar: AppBar(
             title: Row(
               children: [
@@ -158,7 +166,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
 
                 // 1. Top URL & Method & Send Bar
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   child: Row(
                     children: [
                       MethodSelectorWidget(
@@ -171,7 +179,10 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                           controller: _urlController,
                           keyboardType: TextInputType.url,
                           textInputAction: TextInputAction.go,
-                          onSubmitted: (_) => bloc.add(const SendRequestEvent()),
+                          onSubmitted: (_) {
+                            FocusScope.of(context).unfocus();
+                            bloc.add(const SendRequestEvent());
+                          },
                           onChanged: (val) => bloc.add(ChangeUrlEvent(val)),
                           style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
                           decoration: InputDecoration(
@@ -193,7 +204,12 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                       const SizedBox(width: 8),
                       // Send Button
                       ElevatedButton(
-                        onPressed: state.isLoading ? null : () => bloc.add(const SendRequestEvent()),
+                        onPressed: state.isLoading
+                            ? null
+                            : () {
+                                FocusScope.of(context).unfocus();
+                                bloc.add(const SendRequestEvent());
+                              },
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                           backgroundColor: AppColors.primary,
@@ -264,9 +280,10 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                   ),
                 ),
 
-                // 3. Request Configuration Tab Body (Collapsible / Flexible)
+                // 3. Request Configuration Tab Body
+                // If keyboard is open, give full available space to Request tab so inputs aren't squished!
                 Expanded(
-                  flex: 3,
+                  flex: isKeyboardOpen ? 1 : 3,
                   child: TabBarView(
                     controller: _requestTabController,
                     children: [
@@ -298,50 +315,51 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                   ),
                 ),
 
-                const Divider(height: 1, color: AppColors.border),
-
-                // 4. Response Section Header & Body
-                Expanded(
-                  flex: 4,
-                  child: Container(
-                    color: AppColors.background,
-                    child: state.response == null
-                        ? Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(
-                                  Icons.wifi_tethering,
-                                  size: 48,
-                                  color: AppColors.textMuted.withValues(alpha: 0.5),
-                                ),
-                                const SizedBox(height: 12),
-                                const Text(
-                                  'Ready to ping',
-                                  style: TextStyle(
-                                    color: AppColors.textSecondary,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 15,
+                // 4. Response Section (Hidden when typing with keyboard, visible when keyboard is down)
+                if (!isKeyboardOpen) ...[
+                  const Divider(height: 1, color: AppColors.border),
+                  Expanded(
+                    flex: 4,
+                    child: Container(
+                      color: AppColors.background,
+                      child: state.response == null
+                          ? Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.wifi_tethering,
+                                    size: 44,
+                                    color: AppColors.textMuted.withValues(alpha: 0.5),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                const Text(
-                                  'Enter URL or tap "cURL" to import and test',
-                                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+                                  const SizedBox(height: 10),
+                                  const Text(
+                                    'Ready to ping',
+                                    style: TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  const Text(
+                                    'Enter URL or tap "cURL" to import and test',
+                                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : Column(
+                              children: [
+                                MetricsBarWidget(response: state.response!),
+                                Expanded(
+                                  child: ResponseBodyView(response: state.response!),
                                 ),
                               ],
                             ),
-                          )
-                        : Column(
-                            children: [
-                              MetricsBarWidget(response: state.response!),
-                              Expanded(
-                                child: ResponseBodyView(response: state.response!),
-                              ),
-                            ],
-                          ),
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

@@ -7,6 +7,8 @@ import '../../../environments/presentation/bloc/environments_bloc.dart';
 import '../../../environments/presentation/bloc/environments_state.dart';
 import '../../../history/domain/entities/history_item_entity.dart';
 import '../../../history/domain/usecases/history_usecases.dart';
+import '../../../history/presentation/bloc/history_bloc.dart';
+import '../../../history/presentation/bloc/history_event.dart';
 import '../../domain/entities/http_request_entity.dart';
 import '../../domain/entities/key_value_param.dart';
 import '../../domain/usecases/execute_request_usecase.dart';
@@ -18,12 +20,14 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
   final SaveHistoryItemUseCase? saveHistoryItemUseCase;
   final SubstituteEnvVariablesUseCase? substituteEnvVariablesUseCase;
   final EnvironmentsBloc? environmentsBloc;
+  final HistoryBloc? historyBloc;
 
   RequestBuilderBloc({
     required this.executeRequestUseCase,
     this.saveHistoryItemUseCase,
     this.substituteEnvVariablesUseCase,
     this.environmentsBloc,
+    this.historyBloc,
   }) : super(RequestBuilderState.initial()) {
     on<ChangeMethodEvent>(_onChangeMethod);
     on<ChangeUrlEvent>(_onChangeUrl);
@@ -40,8 +44,13 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
     on<ChangeBodyContentEvent>(_onChangeBodyContent);
     on<FormatJsonBodyEvent>(_onFormatJsonBody);
     on<ImportCurlEvent>(_onImportCurl);
+    on<ClearMessagesEvent>(_onClearMessages);
     on<SendRequestEvent>(_onSendRequest);
     on<LoadRequestEvent>(_onLoadRequest);
+  }
+
+  void _onClearMessages(ClearMessagesEvent event, Emitter<RequestBuilderState> emit) {
+    emit(state.copyWith(clearError: true, clearInfo: true));
   }
 
   void _onLoadRequest(LoadRequestEvent event, Emitter<RequestBuilderState> emit) {
@@ -103,6 +112,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
       ..add(KeyValueParam(key: '', value: ''));
     emit(state.copyWith(
       request: state.request.copyWith(queryParams: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -116,6 +127,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
 
     emit(state.copyWith(
       request: state.request.copyWith(queryParams: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -129,6 +142,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
 
     emit(state.copyWith(
       request: state.request.copyWith(queryParams: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -136,6 +151,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
     final updated = state.request.queryParams.where((p) => p.id != event.id).toList();
     emit(state.copyWith(
       request: state.request.copyWith(queryParams: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -144,6 +161,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
       ..add(KeyValueParam(key: '', value: ''));
     emit(state.copyWith(
       request: state.request.copyWith(headers: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -157,6 +176,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
 
     emit(state.copyWith(
       request: state.request.copyWith(headers: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -170,6 +191,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
 
     emit(state.copyWith(
       request: state.request.copyWith(headers: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -177,12 +200,16 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
     final updated = state.request.headers.where((h) => h.id != event.id).toList();
     emit(state.copyWith(
       request: state.request.copyWith(headers: updated),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
   void _onChangeBearerToken(ChangeBearerTokenEvent event, Emitter<RequestBuilderState> emit) {
     emit(state.copyWith(
       request: state.request.copyWith(bearerToken: event.token),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -191,6 +218,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
       request: state.request.copyWith(
         body: state.request.body.copyWith(type: event.bodyType),
       ),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -199,6 +228,8 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
       request: state.request.copyWith(
         body: state.request.body.copyWith(rawContent: event.content),
       ),
+      clearInfo: true,
+      clearError: true,
     ));
   }
 
@@ -211,6 +242,7 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
         body: state.request.body.copyWith(rawContent: formatted),
       ),
       infoMessage: 'JSON formatted',
+      clearError: true,
     ));
   }
 
@@ -248,19 +280,22 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
 
     final response = await executeRequestUseCase(effectiveRequest);
 
-    // Automatically persist to history
+    final historyItem = HistoryItemEntity(
+      id: const Uuid().v4(),
+      request: effectiveRequest,
+      response: response,
+      executedAt: DateTime.now(),
+    );
+
+    // Save to Hive storage
     if (saveHistoryItemUseCase != null) {
       try {
-        await saveHistoryItemUseCase!(
-          HistoryItemEntity(
-            id: const Uuid().v4(),
-            request: effectiveRequest,
-            response: response,
-            executedAt: DateTime.now(),
-          ),
-        );
+        await saveHistoryItemUseCase!(historyItem);
       } catch (_) {}
     }
+
+    // Immediately notify HistoryBloc so memory state updates in real-time
+    historyBloc?.add(AddHistoryItemEvent(historyItem));
 
     emit(state.copyWith(
       isLoading: false,

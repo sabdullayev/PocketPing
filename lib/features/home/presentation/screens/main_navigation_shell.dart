@@ -1,7 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../collections/presentation/bloc/collections_bloc.dart';
+import '../../../collections/presentation/bloc/collections_event.dart';
 import '../../../collections/presentation/screens/collections_screen.dart';
+import '../../../history/presentation/bloc/history_bloc.dart';
+import '../../../history/presentation/bloc/history_event.dart';
 import '../../../history/presentation/screens/history_screen.dart';
+import '../../../monitor/presentation/bloc/monitor_bloc.dart';
+import '../../../monitor/presentation/bloc/monitor_event.dart';
 import '../../../monitor/presentation/screens/monitor_screen.dart';
 import '../../../request_builder/presentation/screens/request_builder_screen.dart';
 
@@ -17,6 +24,17 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
 
   void _navigateToBuilder() {
     setState(() => _currentIndex = 0);
+  }
+
+  void _onTabSelected(int index) {
+    setState(() => _currentIndex = index);
+    if (index == 1) {
+      context.read<HistoryBloc>().add(const LoadHistoryEvent());
+    } else if (index == 2) {
+      context.read<CollectionsBloc>().add(const LoadCollectionsEvent());
+    } else if (index == 3) {
+      context.read<MonitorBloc>().add(const LoadMonitorTargetsEvent());
+    }
   }
 
   @override
@@ -39,7 +57,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           selectedIndex: _currentIndex,
           backgroundColor: AppColors.surface,
           indicatorColor: AppColors.primary.withValues(alpha: 0.2),
-          onDestinationSelected: (index) => setState(() => _currentIndex = index),
+          onDestinationSelected: _onTabSelected,
           destinations: const [
             NavigationDestination(
               icon: Icon(Icons.bolt_outlined, color: AppColors.textSecondary),

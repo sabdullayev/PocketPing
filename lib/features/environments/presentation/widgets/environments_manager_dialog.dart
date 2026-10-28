@@ -31,6 +31,7 @@ class _EnvironmentsManagerDialogState extends State<EnvironmentsManagerDialog> {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
+        scrollable: true,
         backgroundColor: AppColors.card,
         title: const Text('New Environment'),
         content: TextField(
@@ -64,13 +65,15 @@ class _EnvironmentsManagerDialogState extends State<EnvironmentsManagerDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.85,
-      decoration: const BoxDecoration(
-        color: AppColors.background,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: AppColors.background,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: BlocBuilder<EnvironmentsBloc, EnvironmentsState>(
         builder: (context, state) {
           if (state is EnvironmentsLoadingState) {
             return const Center(child: CircularProgressIndicator(color: AppColors.primary));
@@ -294,6 +297,7 @@ class _EnvironmentsManagerDialogState extends State<EnvironmentsManagerDialog> {
           return const SizedBox.shrink();
         },
       ),
+    ),
     );
   }
 }

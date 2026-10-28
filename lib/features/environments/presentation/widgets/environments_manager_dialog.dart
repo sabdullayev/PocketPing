@@ -226,13 +226,21 @@ class _EnvironmentsManagerDialogState extends State<EnvironmentsManagerDialog> {
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
-                        'Variables (Use as {{variable_name}} in request)',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                      const Expanded(
+                        child: Text(
+                          'Variables ({{variable_name}})',
+                          style: TextStyle(color: AppColors.textMuted, fontSize: 12),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
+                      const SizedBox(width: 8),
                       TextButton.icon(
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          minimumSize: Size.zero,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         onPressed: () {
                           final updatedVars = List<EnvironmentVariable>.from(currentEnv.variables)
                             ..add(EnvironmentVariable(key: '', value: ''));

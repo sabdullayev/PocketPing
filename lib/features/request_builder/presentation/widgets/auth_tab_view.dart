@@ -43,8 +43,12 @@ class _AuthTabViewState extends State<AuthTabView> {
   Future<void> _pasteFromClipboard() async {
     final data = await Clipboard.getData(Clipboard.kTextPlain);
     if (data?.text != null && data!.text!.isNotEmpty) {
-      _controller.text = data.text!.trim();
-      widget.onTokenChanged(_controller.text);
+      var token = data.text!.trim();
+      if (token.toLowerCase().startsWith('bearer ')) {
+        token = token.substring(7).trim();
+      }
+      _controller.text = token;
+      widget.onTokenChanged(token);
     }
   }
 
@@ -87,7 +91,17 @@ class _AuthTabViewState extends State<AuthTabView> {
             obscureText: _obscureText,
             maxLines: _obscureText ? 1 : 3,
             style: const TextStyle(fontSize: 13, fontFamily: 'monospace'),
-            onChanged: widget.onTokenChanged,
+            onChanged: (val) {
+              var token = val.trim();
+              if (token.toLowerCase().startsWith('bearer ')) {
+                token = token.substring(7).trim();
+                _controller.value = TextEditingValue(
+                  text: token,
+                  selection: TextSelection.collapsed(offset: token.length),
+                );
+              }
+              widget.onTokenChanged(token);
+            },
             decoration: InputDecoration(
               hintText: 'eyJh... or paste your API token here',
               suffixIcon: Row(

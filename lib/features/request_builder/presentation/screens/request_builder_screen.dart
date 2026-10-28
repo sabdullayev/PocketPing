@@ -9,6 +9,8 @@ import '../../../environments/presentation/bloc/environments_state.dart';
 import '../../../environments/presentation/widgets/environment_selector_widget.dart';
 import '../../../response_viewer/presentation/widgets/metrics_bar_widget.dart';
 import '../../../response_viewer/presentation/widgets/response_body_view.dart';
+import '../../../../core/utils/curl_parser.dart';
+import '../../domain/entities/http_request_entity.dart';
 import '../../domain/entities/request_body.dart';
 import '../bloc/request_builder_bloc.dart';
 import '../bloc/request_builder_event.dart';
@@ -107,24 +109,122 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
     }
   }
 
-  Future<void> _importCurlFromClipboard() async {
+  Future<void> _showCurlDialog(BuildContext context, HttpRequestEntity currentRequest) async {
     final clipData = await Clipboard.getData(Clipboard.kTextPlain);
-    final text = clipData?.text?.trim() ?? '';
-    if (text.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Clipboard is empty!'),
-            backgroundColor: AppColors.statusClientError,
-          ),
-        );
-      }
-      return;
-    }
+    final clipText = clipData?.text?.trim() ?? '';
+    final initialText = CurlParser.isCurl(clipText) ? clipText : '';
+    final controller = TextEditingController(text: initialText);
 
-    if (mounted) {
-      context.read<RequestBuilderBloc>().add(ImportCurlEvent(text));
-    }
+    if (!context.mounted) return;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: EdgeInsets.only(bottom: MediaQuery.of(ctx).viewInsets.bottom),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: const BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      const Row(
+                        children: [
+                          Icon(Icons.terminal, color: AppColors.primary, size: 20),
+                          SizedBox(width: 8),
+                          Text(
+                            'cURL Import & Export',
+                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
+                        ],
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close, color: AppColors.textSecondary),
+                        onPressed: () => Navigator.pop(ctx),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextField(
+                    controller: controller,
+                    maxLines: 5,
+                    style: const TextStyle(fontSize: 12, fontFamily: 'monospace'),
+                    decoration: const InputDecoration(
+                      hintText: 'Paste cURL command here (e.g. curl -X GET "https://api...")',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () async {
+                            final clip = await Clipboard.getData(Clipboard.kTextPlain);
+                            if (clip?.text != null && clip!.text!.trim().isNotEmpty) {
+                              setModalState(() {
+                                controller.text = clip.text!.trim();
+                              });
+                            }
+                          },
+                          icon: const Icon(Icons.paste, size: 16),
+                          label: const Text('Paste'),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                          ),
+                          onPressed: () {
+                            final cmd = controller.text.trim();
+                            if (cmd.isNotEmpty) {
+                              context.read<RequestBuilderBloc>().add(ImportCurlEvent(cmd));
+                              Navigator.pop(ctx);
+                            }
+                          },
+                          icon: const Icon(Icons.download, size: 16),
+                          label: const Text('Import'),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton.icon(
+                    onPressed: () {
+                      final generated = CurlParser.toCurl(currentRequest);
+                      Clipboard.setData(ClipboardData(text: generated));
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Request copied to clipboard as cURL!'),
+                          backgroundColor: AppColors.statusSuccess,
+                          duration: Duration(seconds: 2),
+                        ),
+                      );
+                    },
+                    icon: const Icon(Icons.copy, size: 16, color: AppColors.accent),
+                    label: const Text('Copy Current Request as cURL', style: TextStyle(color: AppColors.accent)),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   @override
@@ -190,10 +290,10 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                 tooltip: 'Save to Collection',
                 onPressed: () => SaveToCollectionDialog.show(context, state.request),
               ),
-              // Killer feature: 1-tap cURL import
+              // Killer feature: 1-tap cURL import & export
               TextButton.icon(
-                onPressed: _importCurlFromClipboard,
-                icon: const Icon(Icons.content_paste_go, size: 16, color: AppColors.primary),
+                onPressed: () => _showCurlDialog(context, state.request),
+                icon: const Icon(Icons.terminal, size: 16, color: AppColors.primary),
                 label: const Text(
                   'cURL',
                   style: TextStyle(
@@ -245,7 +345,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                           keyboardType: TextInputType.url,
                           textInputAction: TextInputAction.go,
                           onSubmitted: (_) {
-                            FocusScope.of(context).unfocus();
+                            FocusManager.instance.primaryFocus?.unfocus();
                             bloc.add(const SendRequestEvent());
                           },
                           onChanged: (val) {
@@ -256,46 +356,64 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                           decoration: InputDecoration(
                             hintText: '{base_url}/todos/1',
                             isDense: true,
-                            contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                            suffixIcon: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                IconButton(
-                                  icon: const Text(
-                                    '{}',
-                                    style: TextStyle(
-                                      color: AppColors.accent,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
+                            suffixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                            suffixIcon: Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  InkWell(
+                                    onTap: () {
+                                      final text = _urlController.text;
+                                      final selection = _urlController.selection;
+                                      final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
+                                      final newText = '${text.substring(0, cursor)}{${text.substring(cursor)}';
+                                      _urlController.value = TextEditingValue(
+                                        text: newText,
+                                        selection: TextSelection.collapsed(offset: cursor + 1),
+                                      );
+                                      _urlFocusNode.requestFocus();
+                                      _checkVariableTrigger(newText);
+                                    },
+                                    borderRadius: BorderRadius.circular(4),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                                      decoration: BoxDecoration(
+                                        color: AppColors.card,
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(color: AppColors.border),
+                                      ),
+                                      child: const Text(
+                                        '{}',
+                                        style: TextStyle(
+                                          color: AppColors.accent,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 12,
+                                        ),
+                                      ),
                                     ),
                                   ),
-                                  tooltip: 'Insert variable',
-                                  onPressed: () {
-                                    final text = _urlController.text;
-                                    final selection = _urlController.selection;
-                                    final cursor = selection.baseOffset >= 0 ? selection.baseOffset : text.length;
-                                    final newText = '${text.substring(0, cursor)}{${text.substring(cursor)}';
-                                    _urlController.value = TextEditingValue(
-                                      text: newText,
-                                      selection: TextSelection.collapsed(offset: cursor + 1),
-                                    );
-                                    _urlFocusNode.requestFocus();
-                                    _checkVariableTrigger(newText);
-                                  },
-                                ),
-                                if (_urlController.text.isNotEmpty)
-                                  IconButton(
-                                    icon: const Icon(Icons.clear, size: 16, color: AppColors.textMuted),
-                                    onPressed: () {
-                                      _urlController.clear();
-                                      bloc.add(const ChangeUrlEvent(''));
-                                      setState(() {
-                                        _showSuggestions = false;
-                                        _activeVariableQuery = null;
-                                      });
-                                    },
-                                  ),
-                              ],
+                                  if (_urlController.text.isNotEmpty) ...[
+                                    const SizedBox(width: 4),
+                                    InkWell(
+                                      onTap: () {
+                                        _urlController.clear();
+                                        bloc.add(const ChangeUrlEvent(''));
+                                        setState(() {
+                                          _showSuggestions = false;
+                                          _activeVariableQuery = null;
+                                        });
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: const Padding(
+                                        padding: EdgeInsets.all(4),
+                                        child: Icon(Icons.close, size: 16, color: AppColors.textMuted),
+                                      ),
+                                    ),
+                                  ],
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -306,7 +424,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                         onPressed: state.isLoading
                             ? null
                             : () {
-                                FocusScope.of(context).unfocus();
+                                FocusManager.instance.primaryFocus?.unfocus();
                                 bloc.add(const SendRequestEvent());
                               },
                         style: ElevatedButton.styleFrom(
@@ -418,11 +536,11 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                   ),
                 ),
 
-                // 4. Response Section (Hidden when typing with keyboard, visible when keyboard is down)
-                if (!isKeyboardOpen) ...[
+                // 4. Response Section (Always visible if response is present; only hide placeholder when keyboard is open)
+                if (!isKeyboardOpen || state.response != null) ...[
                   const Divider(height: 1, color: AppColors.border),
                   Expanded(
-                    flex: 4,
+                    flex: isKeyboardOpen ? 3 : 4,
                     child: Container(
                       color: AppColors.background,
                       child: state.response == null

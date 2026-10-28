@@ -42,5 +42,26 @@ void main() {
       expect(req.body.type, RequestBodyType.json);
       expect(req.body.rawContent, '{"username":"dev","password":"123"}');
     });
+
+    test('Parses Swagger / OpenAPI cURL format with quoted GET and --location', () {
+      const curl = '''curl -X 'GET' \\
+  'https://api.biznex.uz/api/v1/back-office/products?page=0&size=500' \\
+  -H 'accept: application/json' \\
+  -H 'Authorization: Bearer my_token' ''';
+      final req = CurlParser.parse(curl);
+      expect(req, isNotNull);
+      expect(req!.method, HttpMethod.get);
+      expect(req.url, 'https://api.biznex.uz/api/v1/back-office/products');
+      expect(req.bearerToken, 'my_token');
+      expect(req.queryParams.length, 2);
+    });
+
+    test('toCurl exports request to executable cURL command', () {
+      final req = CurlParser.parse('''curl -X GET "https://api.example.com/items?page=1" -H "Accept: application/json" -H "Authorization: Bearer test_tok"''');
+      expect(req, isNotNull);
+      final exported = CurlParser.toCurl(req!);
+      expect(exported, contains("curl -X GET 'https://api.example.com/items?page=1'"));
+      expect(exported, contains("-H 'Authorization: Bearer test_tok'"));
+    });
   });
 }

@@ -7,34 +7,47 @@ class CurlParser {
   CurlParser._();
 
   static bool isCurl(String input) {
-    return input.trim().toLowerCase().startsWith('curl ');
+    final t = input.trim().toLowerCase();
+    return t.startsWith('curl') &&
+        (t.length == 4 || RegExp(r'''^curl[\s\t\r\n'"\-]''').hasMatch(t));
   }
 
   static HttpRequestEntity? parse(String curlCommand) {
     if (!isCurl(curlCommand)) return null;
 
-    // Remove line continuation slashes and newlines
-    String cleaned = curlCommand
-        .replaceAll('\\\r\n', ' ')
-        .replaceAll('\\\n', ' ')
-        .replaceAll('\\\r', ' ')
-        .replaceAll('\\', ' ')
+    // Normalize smart/curved quotes from mobile keyboards
+    String normalized = curlCommand
+        .replaceAll('“', '"')
+        .replaceAll('”', '"')
+        .replaceAll('‘', "'")
+        .replaceAll('’', "'");
+
+    // Remove bash line continuations (\ + newline) and Windows (^ + newline)
+    String cleaned = normalized
+        .replaceAll(RegExp(r'\\\r?\n'), ' ')
+        .replaceAll(RegExp(r'\^\r?\n'), ' ')
+        .replaceAll(RegExp(r'[\r\n]+'), ' ')
         .replaceAll(RegExp(r'\s+'), ' ')
         .trim();
 
-    // 1. Extract Method
+    // 1. Extract Method (-X, --request)
     HttpMethod method = HttpMethod.get;
-    final methodMatch = RegExp(r'(?:-X|--request)\s+([A-Za-z]+)', caseSensitive: false).firstMatch(cleaned);
+    final methodMatch = RegExp(r'''(?:-X|--request)\s+['"]?([A-Za-z]+)['"]?''', caseSensitive: false)
+        .firstMatch(cleaned);
     if (methodMatch != null) {
       method = HttpMethod.fromString(methodMatch.group(1)!);
     }
 
-    // 2. Extract Headers
+    // 2. Extract Headers (-H, --header)
     final List<KeyValueParam> headers = [];
     String? bearerToken;
-    final headerRegex = RegExp(r"(?:-H|--header)\s+(?:'([^']+)'|" '"([^"]+)")');
+    final headerRegex = RegExp(
+      r"""(?:-H|--header)\s*(?:'([^']+)'|"([^"]+)"|([^\s'"]+))""",
+      caseSensitive: false,
+    );
+
     for (final match in headerRegex.allMatches(cleaned)) {
-      final headerStr = match.group(1) ?? match.group(2);
+      final headerStr = match.group(1) ?? match.group(2) ?? match.group(3);
       if (headerStr != null && headerStr.contains(':')) {
         final colonIndex = headerStr.indexOf(':');
         final key = headerStr.substring(0, colonIndex).trim();
@@ -49,9 +62,12 @@ class CurlParser {
       }
     }
 
-    // 3. Extract Body (-d, --data, --data-raw)
+    // 3. Extract Body (-d, --data, --data-raw, --data-binary, --data-urlencode)
     RequestBody body = const RequestBody();
-    final bodyRegex = RegExp(r"(?:-d|--data|--data-raw)\s+(?:'([\s\S]*?)'|" r'"([\s\S]*?)")');
+    final bodyRegex = RegExp(
+      r"""(?:-d|--data|--data-raw|--data-binary|--data-urlencode)\s*(?:'([\s\S]*?)'|"([\s\S]*?)")""",
+      caseSensitive: false,
+    );
     final bodyMatch = bodyRegex.firstMatch(cleaned);
     if (bodyMatch != null) {
       final content = bodyMatch.group(1) ?? bodyMatch.group(2) ?? '';
@@ -60,7 +76,6 @@ class CurlParser {
         type: isJson ? RequestBodyType.json : RequestBodyType.raw,
         rawContent: content,
       );
-      // If no explicit method was given, data implies POST
       if (methodMatch == null) {
         method = HttpMethod.post;
       }
@@ -68,12 +83,11 @@ class CurlParser {
 
     // 4. Extract URL (Look for http/https URL)
     String url = '';
-    final urlRegex = RegExp(r'''(?:'|")(https?://[^'"]+)(?:'|")|(?<=\s)(https?://[^\s]+)''');
+    final urlRegex = RegExp(r'''['"](https?://[^'"]+)['"]|(?<=\s|^)(https?://[^\s'"]+)''', caseSensitive: false);
     final urlMatch = urlRegex.firstMatch(cleaned);
     if (urlMatch != null) {
       url = urlMatch.group(1) ?? urlMatch.group(2) ?? '';
     } else {
-      // Fallback: look for argument that doesn't start with '-' and isn't curl
       final tokens = cleaned.split(' ');
       for (int i = 1; i < tokens.length; i++) {
         final token = tokens[i].replaceAll("'", "").replaceAll('"', '');
@@ -109,5 +123,30 @@ class CurlParser {
       bearerToken: bearerToken,
       body: body,
     );
+  }
+
+  /// Exports an HttpRequestEntity as a standard executable cURL command
+  static String toCurl(HttpRequestEntity request) {
+    final buffer = StringBuffer('curl');
+    buffer.write(' -X ${request.method.label}');
+
+    final uri = request.toUri();
+    final effectiveUrl = uri?.toString() ?? request.url;
+    buffer.write(" '$effectiveUrl'");
+
+    final headers = request.getEffectiveHeaders();
+    headers.forEach((k, v) {
+      buffer.write(" \\\n  -H '$k: $v'");
+    });
+
+    if (request.body.type == RequestBodyType.json && request.body.rawContent.trim().isNotEmpty) {
+      final escaped = request.body.rawContent.replaceAll("'", r"'\''");
+      buffer.write(" \\\n  -d '$escaped'");
+    } else if (request.body.type == RequestBodyType.raw && request.body.rawContent.trim().isNotEmpty) {
+      final escaped = request.body.rawContent.replaceAll("'", r"'\''");
+      buffer.write(" \\\n  -d '$escaped'");
+    }
+
+    return buffer.toString();
   }
 }

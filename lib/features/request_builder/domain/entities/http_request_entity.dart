@@ -67,7 +67,11 @@ class HttpRequestEntity extends Equatable {
       }
     }
     if (bearerToken != null && bearerToken!.trim().isNotEmpty) {
-      map['Authorization'] = 'Bearer ${bearerToken!.trim()}';
+      final clean = bearerToken!.trim();
+      final tokenOnly = clean.toLowerCase().startsWith('bearer ')
+          ? clean.substring(7).trim()
+          : clean;
+      map['Authorization'] = 'Bearer $tokenOnly';
     }
     if (body.type == RequestBodyType.json && !map.containsKey('Content-Type')) {
       map['Content-Type'] = 'application/json';

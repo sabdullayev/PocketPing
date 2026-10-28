@@ -6,6 +6,7 @@ import 'fullscreen_body_editor_dialog.dart';
 
 class BodyTabView extends StatefulWidget {
   final RequestBody body;
+  final bool isKeyboardOpen;
   final ValueChanged<RequestBodyType> onTypeChanged;
   final ValueChanged<String> onContentChanged;
   final VoidCallback onFormatJson;
@@ -13,6 +14,7 @@ class BodyTabView extends StatefulWidget {
   const BodyTabView({
     super.key,
     required this.body,
+    this.isKeyboardOpen = false,
     required this.onTypeChanged,
     required this.onContentChanged,
     required this.onFormatJson,
@@ -95,13 +97,48 @@ class _BodyTabViewState extends State<BodyTabView> {
     );
   }
 
+  Widget _actionButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+    Color color = AppColors.accent,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                color: color,
+                fontWeight: FontWeight.w600,
+                fontSize: 11,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final isKeyboardOpen = MediaQuery.viewInsetsOf(context).bottom > 0;
+    final isKeyboardOpen = widget.isKeyboardOpen || MediaQuery.viewInsetsOf(context).bottom > 0;
 
     return Column(
       children: [
-        // Type Switcher Row (Only show when keyboard is closed to preserve maximum screen space for editor)
+        // Row 1: Type Switcher Chips (Clean & isolated; hidden when typing to maximize screen height)
         if (!isKeyboardOpen)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -146,27 +183,6 @@ class _BodyTabViewState extends State<BodyTabView> {
                     ),
                   ),
                 ),
-                if (widget.body.type != RequestBodyType.none) ...[
-                  if (widget.body.type == RequestBodyType.json)
-                    TextButton.icon(
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        minimumSize: Size.zero,
-                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      ),
-                      onPressed: widget.onFormatJson,
-                      icon: const Icon(Icons.auto_fix_high, size: 14, color: AppColors.accent),
-                      label: const Text(
-                        'Beautify',
-                        style: TextStyle(color: AppColors.accent, fontSize: 12),
-                      ),
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.fullscreen, color: AppColors.accent, size: 20),
-                    tooltip: 'Fullscreen Editor',
-                    onPressed: _openFullscreen,
-                  ),
-                ],
               ],
             ),
           ),
@@ -181,12 +197,13 @@ class _BodyTabViewState extends State<BodyTabView> {
             ),
           )
         else ...[
-          // Quick JSON Snippets Toolbar
+          // Row 2: Editor Toolbar (Quick snippets on Left, Actions [Beautify & Expand] on Right)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 3),
             child: Row(
               children: [
-                if (widget.body.type == RequestBodyType.json) ...[
+                // Left: Quick Snippets (scrollable horizontally if screen is small)
+                if (widget.body.type == RequestBodyType.json)
                   Expanded(
                     child: SingleChildScrollView(
                       scrollDirection: Axis.horizontal,
@@ -194,48 +211,44 @@ class _BodyTabViewState extends State<BodyTabView> {
                         children: [
                           const Text('Quick: ', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
                           _snippetChip('{}', '{\n  \n}'),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           _snippetChip('[]', '[\n  \n]'),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           _snippetChip('"key": "val"', '"key": "value"'),
                         ],
                       ),
                     ),
-                  ),
-                ] else
+                  )
+                else
                   const Spacer(),
-                if (isKeyboardOpen) ...[
-                  if (widget.body.type == RequestBodyType.json)
-                    IconButton(
-                      icon: const Icon(Icons.auto_fix_high, size: 16, color: AppColors.accent),
-                      tooltip: 'Format JSON',
-                      onPressed: widget.onFormatJson,
-                    ),
-                  IconButton(
-                    icon: const Icon(Icons.fullscreen, size: 18, color: AppColors.accent),
-                    tooltip: 'Fullscreen Editor',
-                    onPressed: _openFullscreen,
+                const SizedBox(width: 6),
+                // Right: Action Buttons (Fills the space beautifully!)
+                if (widget.body.type == RequestBodyType.json) ...[
+                  _actionButton(
+                    icon: Icons.auto_fix_high,
+                    label: 'Beautify',
+                    onTap: widget.onFormatJson,
                   ),
-                  InkWell(
+                  const SizedBox(width: 6),
+                ],
+                _actionButton(
+                  icon: Icons.fullscreen,
+                  label: 'Expand',
+                  onTap: _openFullscreen,
+                ),
+                if (isKeyboardOpen) ...[
+                  const SizedBox(width: 6),
+                  _actionButton(
+                    icon: Icons.keyboard_hide,
+                    label: 'Done',
+                    color: AppColors.textMuted,
                     onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-                    borderRadius: BorderRadius.circular(4),
-                    child: const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.keyboard_hide, size: 14, color: AppColors.textMuted),
-                          SizedBox(width: 4),
-                          Text('Done', style: TextStyle(color: AppColors.textMuted, fontSize: 11)),
-                        ],
-                      ),
-                    ),
                   ),
                 ],
               ],
             ),
           ),
-          // Editor Field (Expands to fill all remaining height without shrinking)
+          // Editor Field (Spacious, fills all available height)
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),

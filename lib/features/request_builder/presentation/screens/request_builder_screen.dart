@@ -403,9 +403,9 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                 ),
 
                 // 3. Request Configuration Tab Body
-                // When keyboard is open, give 100% of available space to the input tab so the editor never gets squished
+                // Takes full available height when no response, or splits evenly when response is present
                 Expanded(
-                  flex: isKeyboardOpen ? 1 : 3,
+                  flex: 1,
                   child: TabBarView(
                     controller: _requestTabController,
                     children: [
@@ -429,6 +429,7 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                       ),
                       BodyTabView(
                         body: request.body,
+                        isKeyboardOpen: isKeyboardOpen,
                         onTypeChanged: (type) => bloc.add(ChangeBodyTypeEvent(type)),
                         onContentChanged: (content) => bloc.add(ChangeBodyContentEvent(content)),
                         onFormatJson: () => bloc.add(const FormatJsonBodyEvent()),
@@ -438,51 +439,25 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                 ),
 
                 // 4. Response Section
-                // When keyboard is open, hide response section completely so inputs have full height and never disappear!
-                if (!isKeyboardOpen) ...[
+                // ONLY shown when a response exists AND keyboard is not open.
+                // When response == null, Request Tabs have 100% height (no wasted screen space).
+                if (!isKeyboardOpen && state.response != null) ...[
                   const Divider(height: 1, color: AppColors.border),
                   Expanded(
-                    flex: 4,
+                    flex: 1,
                     child: Container(
                       color: AppColors.background,
-                      child: state.response == null
-                          ? Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.wifi_tethering,
-                                    size: 44,
-                                    color: AppColors.textMuted.withValues(alpha: 0.5),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  const Text(
-                                    'Ready to ping',
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  const Text(
-                                    'Enter URL or tap "cURL" to import and test',
-                                    style: TextStyle(color: AppColors.textMuted, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            )
-                          : Column(
-                              children: [
-                                MetricsBarWidget(
-                                  response: state.response!,
-                                  onClose: () => bloc.add(const ClearResponseEvent()),
-                                ),
-                                Expanded(
-                                  child: ResponseBodyView(response: state.response!),
-                                ),
-                              ],
-                            ),
+                      child: Column(
+                        children: [
+                          MetricsBarWidget(
+                            response: state.response!,
+                            onClose: () => bloc.add(const ClearResponseEvent()),
+                          ),
+                          Expanded(
+                            child: ResponseBodyView(response: state.response!),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ],

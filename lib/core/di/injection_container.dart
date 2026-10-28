@@ -17,6 +17,11 @@ import '../../features/history/data/repositories/history_repository_impl.dart';
 import '../../features/history/domain/repositories/history_repository.dart';
 import '../../features/history/domain/usecases/history_usecases.dart';
 import '../../features/history/presentation/bloc/history_bloc.dart';
+import '../../features/monitor/data/datasources/monitor_local_datasource.dart';
+import '../../features/monitor/data/repositories/monitor_repository_impl.dart';
+import '../../features/monitor/domain/repositories/monitor_repository.dart';
+import '../../features/monitor/domain/usecases/monitor_usecases.dart';
+import '../../features/monitor/presentation/bloc/monitor_bloc.dart';
 import '../../features/request_builder/data/repositories/request_repository_impl.dart';
 import '../../features/request_builder/domain/repositories/request_repository.dart';
 import '../../features/request_builder/domain/usecases/execute_request_usecase.dart';
@@ -134,7 +139,38 @@ Future<void> initDependencies({String? hivePath}) async {
     ),
   );
 
-  // 7. Request Builder Bloc
+  // 7. Health Check Monitor Feature
+  sl.registerLazySingleton<MonitorLocalDataSource>(
+    () => MonitorLocalDataSourceImpl(),
+  );
+  sl.registerLazySingleton<MonitorRepository>(
+    () => MonitorRepositoryImpl(
+      localDataSource: sl(),
+      dioClient: sl(),
+    ),
+  );
+  sl.registerLazySingleton<GetMonitorTargetsUseCase>(
+    () => GetMonitorTargetsUseCase(sl()),
+  );
+  sl.registerLazySingleton<SaveMonitorTargetUseCase>(
+    () => SaveMonitorTargetUseCase(sl()),
+  );
+  sl.registerLazySingleton<DeleteMonitorTargetUseCase>(
+    () => DeleteMonitorTargetUseCase(sl()),
+  );
+  sl.registerLazySingleton<PingTargetUseCase>(
+    () => PingTargetUseCase(sl()),
+  );
+  sl.registerFactory<MonitorBloc>(
+    () => MonitorBloc(
+      getMonitorTargetsUseCase: sl(),
+      saveMonitorTargetUseCase: sl(),
+      deleteMonitorTargetUseCase: sl(),
+      pingTargetUseCase: sl(),
+    ),
+  );
+
+  // 8. Request Builder Bloc
   sl.registerFactory<RequestBuilderBloc>(
     () => RequestBuilderBloc(
       executeRequestUseCase: sl(),

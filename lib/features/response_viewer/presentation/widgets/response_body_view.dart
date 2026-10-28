@@ -5,6 +5,7 @@ import 'package:flutter_highlight/themes/atom-one-dark.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/json_isolate_service.dart';
 import '../../domain/entities/http_response_entity.dart';
+import 'json_tree_view.dart';
 
 class ResponseBodyView extends StatefulWidget {
   final HttpResponseEntity response;
@@ -19,12 +20,16 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
   String _formattedJson = '';
+  dynamic _parsedJson;
   bool _isFormatting = false;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(
+      length: widget.response.isJson ? 4 : 3,
+      vsync: this,
+    );
     _formatContent();
   }
 
@@ -32,6 +37,14 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
   void didUpdateWidget(covariant ResponseBodyView oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.response.bodyString != widget.response.bodyString) {
+      if ((oldWidget.response.isJson && !widget.response.isJson) ||
+          (!oldWidget.response.isJson && widget.response.isJson)) {
+        _tabController.dispose();
+        _tabController = TabController(
+          length: widget.response.isJson ? 4 : 3,
+          vsync: this,
+        );
+      }
       _formatContent();
     }
   }
@@ -40,15 +53,18 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
     if (widget.response.isJson && widget.response.bodyString.isNotEmpty) {
       setState(() => _isFormatting = true);
       final formatted = await JsonIsolateService.formatJson(widget.response.bodyString);
+      final parsed = await JsonIsolateService.parseJson(widget.response.bodyString);
       if (mounted) {
         setState(() {
           _formattedJson = formatted;
+          _parsedJson = parsed;
           _isFormatting = false;
         });
       }
     } else {
       setState(() {
         _formattedJson = widget.response.bodyString;
+        _parsedJson = null;
         _isFormatting = false;
       });
     }
@@ -73,6 +89,8 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
 
   @override
   Widget build(BuildContext context) {
+    final isJson = widget.response.isJson;
+
     return Column(
       children: [
         // Sub-tabs & Copy Button
@@ -85,9 +103,10 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
                   controller: _tabController,
                   isScrollable: true,
                   tabAlignment: TabAlignment.start,
-                  labelPadding: const EdgeInsets.symmetric(horizontal: 14),
+                  labelPadding: const EdgeInsets.symmetric(horizontal: 12),
                   tabs: [
-                    Tab(text: widget.response.isJson ? 'JSON' : 'Preview'),
+                    if (isJson) const Tab(text: 'Tree'),
+                    Tab(text: isJson ? 'Pretty' : 'Preview'),
                     const Tab(text: 'Raw'),
                     Tab(text: 'Headers (${widget.response.headers.length})'),
                   ],
@@ -97,7 +116,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
                 icon: const Icon(Icons.copy, size: 18, color: AppColors.textSecondary),
                 tooltip: 'Copy Body',
                 onPressed: () => _copyToClipboard(
-                  _tabController.index == 0 ? _formattedJson : widget.response.bodyString,
+                  _formattedJson.isNotEmpty ? _formattedJson : widget.response.bodyString,
                   'Response',
                 ),
               ),
@@ -109,11 +128,9 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
           child: TabBarView(
             controller: _tabController,
             children: [
-              // 1. JSON / Preview Tab
-              _buildPreviewTab(),
-              // 2. Raw Tab
+              if (isJson) _buildTreeTab(),
+              _buildPrettyTab(),
               _buildRawTab(),
-              // 3. Headers Tab
               _buildHeadersTab(),
             ],
           ),
@@ -122,7 +139,19 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
     );
   }
 
-  Widget _buildPreviewTab() {
+  Widget _buildTreeTab() {
+    if (_isFormatting) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+    }
+    if (_parsedJson == null) {
+      return const Center(
+        child: Text('Unable to parse JSON tree', style: TextStyle(color: AppColors.textMuted)),
+      );
+    }
+    return JsonTreeView(data: _parsedJson);
+  }
+
+  Widget _buildPrettyTab() {
     if (_isFormatting) {
       return const Center(
         child: CircularProgressIndicator(color: AppColors.primary),

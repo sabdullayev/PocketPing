@@ -27,32 +27,46 @@
     - Экран `CollectionsScreen` с раскрывающимися папками-аккордеонами и списком запросов.
     - Удаление папок и отдельных запросов.
   - **Главная навигация (`features/home`)**:
-    - Нижняя панель навигации `MainNavigationShell` (Material 3) с вкладками `Ping`, `History`, `Collections`.
+    - Нижняя панель навигации `MainNavigationShell` (Material 3) с вкладками `Ping`, `History`, `Collections`, `Monitor`.
 - [x] **Этап 3 (Киллер-фичи: Переменные окружения / Environments):**
   - Поддержка переменных окружения `{{base_url}}`, `{{token}}`, `{{user_id}}` и др.
   - Хранение в Hive (`environments_box`) с предзаполненными окружениями (`Development` и `Production`).
   - Юзкейс `SubstituteEnvVariablesUseCase` для автоматической замены переменных во всех слоях запроса (URL, Query, Headers, Bearer, Body) без модификации исходного шаблона в редакторе.
   - Компоненты UI: `EnvironmentSelectorWidget` (активный бейдж вверху экрана) и `EnvironmentsManagerDialog` (редактор окружений и переменных).
   - Unit-тесты подстановки переменных (`test/env_variables_test.dart`).
-- [ ] **Этап 4 (Продвинутый уровень: JSON Tree & Health Check):** 
-  - Интерактивное сворачиваемое дерево JSON (JSON Tree View) с копированием пути к полю (напр. `data.users[0].id`).
-  - Фоновый Health Check серверов через `workmanager` + локальные пуш-уведомления при сбоях.
+- [x] **Этап 4 (Продвинутый уровень: JSON Tree & Health Check):** 
+  - **Интерактивное сворачиваемое дерево JSON (`JsonTreeView`)**:
+    - Раскрытие/сворачивание объектов `{}` и массивов `[]` со счетчиками элементов.
+    - Цветовая дифференциация типов (String — зеленый, Number — оранжевый, Boolean — фиолетовый, Null — серый).
+    - Долгое нажатие (Long-press) на любой узел открывает меню с копированием **значения** или **точного JSON-пути** (например `data.users[0].id`).
+    - Обработка в отдельном фоновом потоке Dart через `Isolate.run()`.
+  - **Фоновый Health Check монитор (`features/monitor`)**:
+    - Добавление серверов для постоянного пинга с настройкой интервала (15, 30, 60 мин).
+    - Ручной пинг любого сервера или всех сразу с замером времени и статус-кода.
+    - Фоновый процесс Android/iOS через `workmanager` (`BackgroundPingService`).
+    - Отправка громких локальных пуш-уведомлений через `flutter_local_notifications` (`NotificationService`), если сервер ответил ошибкой (не 200) или упал по таймауту.
+    - Разрешения на работу с сетью, HTTP-трафиком (`usesCleartextTraffic`) и уведомлениями в `AndroidManifest.xml`.
 
 ---
 
 ## Журнал изменений (Changelog)
 
-### [2026-10-27] — Этап 3: Переменные окружения (Environments)
+### [2026-10-28] — Этап 4: Интерактивное дерево JSON (JSON Tree) и Фоновый Health Check
 - **Статус:** Выполнено, протестировано (`flutter analyze` — 0 issues, `flutter test` — 6 passed).
 - **Ключевые файлы:**
-  - `lib/features/environments/` — сущности `EnvironmentEntity` и `EnvironmentVariable`, Hive-источник `EnvironmentsLocalDataSourceImpl`, юзкейсы `SubstituteEnvVariablesUseCase`, BLoC `EnvironmentsBloc`.
-  - `lib/features/environments/presentation/widgets/` — `EnvironmentSelectorWidget` и `EnvironmentsManagerDialog`.
-  - `lib/features/request_builder/presentation/bloc/request_builder_bloc.dart` — внедрение авто-подстановки переменных окружения перед сетевым вызовом.
-  - `test/env_variables_test.dart` — тесты юзкейса замены переменных.
+  - `lib/features/response_viewer/presentation/widgets/json_tree_view.dart` — компонент интерактивного сворачиваемого дерева JSON с подсветкой типов и копированием пути / значения.
+  - `lib/core/services/notification_service.dart` — сервис локальных пуш-уведомлений о падении серверов.
+  - `lib/core/services/background_ping_service.dart` — фоновый планировщик задач Workmanager для фонового пинга.
+  - `lib/features/monitor/` — модуль Health Check монитора (сущности, репозитории, BLoC, карточки серверов со статусами).
+  - `android/app/src/main/AndroidManifest.xml` — разрешения INTERNET, POST_NOTIFICATIONS и `usesCleartextTraffic`.
+
+### [2026-10-27] — Этап 3: Переменные окружения (Environments)
+- **Статус:** Выполнено, протестировано.
+- Сущности и юзкейсы `SubstituteEnvVariablesUseCase`, BLoC, переключатель `EnvironmentSelectorWidget` и диалог редактирования `EnvironmentsManagerDialog`.
 
 ### [2026-10-27] — Этап 2: Локальная БД (Hive), История запросов, Коллекции и Главная навигация
 - **Статус:** Выполнено, протестировано.
-- Добавлена история запросов, коллекции, папки и нижняя панель навигации `MainNavigationShell`.
+- Реализованы история, коллекции, папки, `MainNavigationShell`.
 
 ### [2026-10-27] — Этап 1: Сетевое ядро, Request Builder, cURL-импорт и Response Viewer
 - **Статус:** Выполнено, протестировано.
@@ -60,4 +74,4 @@
 
 ### [2026-10-27] — Этап 0: Инициализация проекта и Clean Architecture структура
 - **Статус:** Выполнено.
-- Инициализирован проект Flutter, созданы папки Clean Architecture, написана документация `ARCHITECTURE.md` и `FEATURES_LOG.md`.
+- Инициализирован проект Flutter, Clean Architecture структура, `ARCHITECTURE.md` и `FEATURES_LOG.md`.

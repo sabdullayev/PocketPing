@@ -7,6 +7,7 @@ import 'features/environments/presentation/bloc/environments_bloc.dart';
 import 'features/environments/presentation/bloc/environments_event.dart';
 import 'features/history/presentation/bloc/history_bloc.dart';
 import 'features/home/presentation/screens/main_navigation_shell.dart';
+import 'features/monitor/presentation/bloc/monitor_bloc.dart';
 import 'features/request_builder/presentation/bloc/request_builder_bloc.dart';
 
 class PocketPingApp extends StatelessWidget {
@@ -27,6 +28,9 @@ class PocketPingApp extends StatelessWidget {
         ),
         BlocProvider<CollectionsBloc>(
           create: (_) => sl<CollectionsBloc>(),
+        ),
+        BlocProvider<MonitorBloc>(
+          create: (_) => sl<MonitorBloc>(),
         ),
       ],
       child: MaterialApp(

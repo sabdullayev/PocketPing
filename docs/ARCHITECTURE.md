@@ -9,11 +9,12 @@
 **PocketPing** — карманный мобильный Postman и сетевой сканер/монитор.
 - **Цель:** Быстрое тестирование HTTP/REST API с мобильного устройства без необходимости открывать ноутбук.
 - **Ключевые фичи:** 
-  1. Умный конструктор запросов (Query-параметры, Headers, Bearer Auth, Body JSON / Form-Data).
-  2. Импорт cURL из буфера в один тап (RegEx парсер).
-  3. Просмотр ответа и метрик (статус, ms через Stopwatch, KB, Json Tree View через `Isolate.run()`).
-  4. Коллекции и переменные окружения (`{{base_url}}`, `{{token}}`, Dev/Prod режимы).
-  5. Фоновый Health Check серверов с локальными пуш-уведомлениями при падении.
+  1. **Умный конструктор запросов:** Метод с цветными плашками, авто-сплит Query-параметров, Headers, Bearer Auth, Body JSON / Form-Data.
+  2. **Импорт cURL из буфера в 1 тап:** RegEx парсер методов, заголовков, токенов, тела и адресов.
+  3. **Просмотр ответа и метрик:** статус, тайминг ms через `Stopwatch`, размер KB, форматирование через `Isolate.run()`.
+  4. **Интерактивное дерево JSON (`JsonTreeView`):** сворачивание узлов, подсветка типов, долгое нажатие для копирования значения или точного JSON-пути (`data.users[0].id`).
+  5. **Коллекции и переменные окружения:** папки запросов, `{{base_url}}`, `{{token}}`, быстрое переключение Dev/Prod.
+  6. **Фоновый Health Check монитор:** периодический опрос серверов через `workmanager` и громкие локальные пуш-уведомления при падении или таймаутах.
 
 ---
 
@@ -26,7 +27,7 @@
 | **Стейт-менеджмент** | `flutter_bloc` | Предсказуемый однонаправленный поток состояний |
 | **DI (Service Locator)** | `get_it` | Инъекция зависимостей без жесткой связности |
 | **Сетевой клиент** | `dio` | HTTP-запросы, интерцепторы, замер таймингов, обход SSL |
-| **Локальная БД** | `hive_ce` / `hive` | Хранение истории запросов, коллекций и переменных |
+| **Локальная БД** | `hive_flutter` | Быстрое NoSQL-хранилище истории, коллекций, окружений и мониторов |
 | **Многопоточность** | `Isolate.run()` | Тяжелый парсинг и форматирование больших JSON ответов |
 | **Фоновые задачи** | `workmanager` + `flutter_local_notifications` | Фоновый пинг серверов и алерты |
 | **Синтаксис / UI** | `flutter_highlight` | Подсветка JSON/XML в ответе сервера |
@@ -42,9 +43,9 @@
 feature_name/
 ├── data/           # Слой данных (внешний мир: API, база данных, парсинг DTO)
 │   ├── datasources/# Источники данных (Local/Remote)
-│   ├── models/     # DTO / модели (маппинг JSON <-> Entity)
+│   ├── models/     # DTO / модели (маппинг JSON/Map <-> Entity)
 │   └── repositories/# Реализация репозиториев из Domain слоя
-├── domain/         # Слой бизнес-логики (чистый Dart, без Flutter и внешних библиотек)
+├── domain/         # Слой бизнес-логики (чистый Dart, без UI и внешних библиотек)
 │   ├── entities/   # Чистые бизнес-сущности
 │   ├── repositories/# Абстрактные интерфейсы репозиториев (контракты)
 │   └── usecases/   # Сценарии использования (Single Responsibility)
@@ -70,37 +71,37 @@ PocketPing/
 │   └── FEATURES_LOG.md            # Лог реализованных фичей и изменений
 ├── lib/
 │   ├── app.dart                   # Корневой MaterialApp, MultiBlocProvider, темы
-│   ├── main.dart                  # Точка входа, инициализация DI и Hive
+│   ├── main.dart                  # Точка входа, инициализация DI, Hive, Workmanager, Notifications
 │   ├── core/                      # Общий код для всех фичей
 │   │   ├── constants/             # Цвета, размеры, строковые константы
 │   │   ├── di/                    # Регистрация зависимостей в GetIt
 │   │   ├── errors/                # Failure и Exception классы
 │   │   ├── network/               # Конфигурация Dio, интерцепторы, SSL bypass
-│   │   ├── services/              # Сервисы уведомлений, изоляты, буфер обмена
-│   │   ├── theme/                 # Стили, темная/светлая тема
+│   │   ├── services/              # Сервисы уведомлений, изоляты, workmanager
+│   │   ├── theme/                 # Стили, темная тема для разработчиков
 │   │   └── utils/                 # cURL парсер, форматтеры, валидаторы
 │   └── features/                  # Модули приложения
-│       ├── home/                  # Главная навигация (MainNavigationShell)
+│       ├── home/                  # Главная навигация (MainNavigationShell: 4 вкладки)
 │       ├── request_builder/       # Конструктор HTTP-запросов и импорт cURL
-│       ├── response_viewer/       # Просмотр ответа, метрик, дерево JSON
+│       ├── response_viewer/       # Просмотр ответа, метрик, дерево JSON (JsonTreeView)
 │       ├── collections/           # Папки, коллекции сохраненных запросов (Hive)
-│       ├── environments/          # Переменные ({{base_url}}) и переключение Dev/Prod
-│       ├── history/               # История отправленных запросов (Hive)
-│       └── monitor/               # Фоновый пинг серверов (Health Check)
+│       ├── environments/          # Переменные ({{base_url}}) и переключение Dev/Prod (Hive)
+│       ├── history/               # Авто-история отправленных запросов (Hive)
+│       └── monitor/               # Фоновый Health Check серверов (Hive + Workmanager)
 ```
 
 ---
 
 ## 5. Поток данных (Data Flow)
 
-1. **User Action:** Пользователь вводит URL или нажимает «Отправить».
-2. **UI -> BLoC:** Виджет шлет событие (напр. `SendHttpRequestEvent`) в `RequestBuilderBloc`.
-3. **BLoC -> UseCase:** BLoC заменяет переменные окружения через `SubstituteEnvVariablesUseCase` и вызывает `ExecuteRequestUseCase`.
-4. **UseCase -> Repository:** `ExecuteRequestUseCase` вызывает `RequestRepository.execute(request)`.
+1. **User Action:** Пользователь вводит URL/выбирает метод или импортирует cURL в 1 тап.
+2. **UI -> BLoC:** Виджет шлет событие (напр. `SendRequestEvent`) в `RequestBuilderBloc`.
+3. **BLoC -> UseCase (Env substitution):** BLoC вызывает `SubstituteEnvVariablesUseCase` для замены `{{key}}` значениями из активного окружения.
+4. **BLoC -> UseCase (Execute):** `ExecuteRequestUseCase` вызывает `RequestRepository.execute(request)`.
 5. **Repository -> Network/DataSource:** `RequestRepositoryImpl` использует `DioClient` с замером времени через `Stopwatch`.
 6. **Data -> Isolate:** Сырой JSON ответ парсится через `Isolate.run()` без блокировки UI.
-7. **State Update:** BLoC эмитит `RequestSuccessState` с сущностью `ResponseEntity`.
-8. **UI Render:** `ResponseViewerScreen` отрисовывает статус, тайминг, размер и раскрывающееся дерево JSON.
+7. **Auto-History:** `RequestBuilderBloc` автоматически сохраняет выполненный запрос в историю через `SaveHistoryItemUseCase`.
+8. **UI Render:** `MetricsBarWidget` отрисовывает статус, тайминг, размер. `ResponseBodyView` открывает интерактивное дерево `JsonTreeView` или код с подсветкой.
 
 ---
 

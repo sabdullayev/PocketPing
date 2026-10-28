@@ -30,5 +30,6 @@ void main() {
     expect(find.text('Ping'), findsOneWidget);
     expect(find.text('History'), findsOneWidget);
     expect(find.text('Collections'), findsOneWidget);
+    expect(find.text('Monitor'), findsOneWidget);
   });
 }

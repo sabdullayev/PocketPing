@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../collections/presentation/screens/collections_screen.dart';
 import '../../../history/presentation/screens/history_screen.dart';
+import '../../../monitor/presentation/screens/monitor_screen.dart';
 import '../../../request_builder/presentation/screens/request_builder_screen.dart';
 
 class MainNavigationShell extends StatefulWidget {
@@ -27,6 +28,7 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
           const RequestBuilderScreen(),
           HistoryScreen(onNavigateToBuilder: _navigateToBuilder),
           CollectionsScreen(onNavigateToBuilder: _navigateToBuilder),
+          const MonitorScreen(),
         ],
       ),
       bottomNavigationBar: Container(
@@ -53,6 +55,11 @@ class _MainNavigationShellState extends State<MainNavigationShell> {
               icon: Icon(Icons.folder_outlined, color: AppColors.textSecondary),
               selectedIcon: Icon(Icons.folder, color: AppColors.primary),
               label: 'Collections',
+            ),
+            NavigationDestination(
+              icon: Icon(Icons.monitor_heart_outlined, color: AppColors.textSecondary),
+              selectedIcon: Icon(Icons.monitor_heart, color: AppColors.methodDelete),
+              label: 'Monitor',
             ),
           ],
         ),

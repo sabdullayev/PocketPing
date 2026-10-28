@@ -4,8 +4,13 @@ import '../../domain/entities/http_response_entity.dart';
 
 class MetricsBarWidget extends StatelessWidget {
   final HttpResponseEntity response;
+  final VoidCallback? onClose;
 
-  const MetricsBarWidget({super.key, required this.response});
+  const MetricsBarWidget({
+    super.key,
+    required this.response,
+    this.onClose,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -66,6 +71,22 @@ class MetricsBarWidget extends StatelessWidget {
             text: response.formattedSize,
             color: AppColors.accent,
           ),
+          if (onClose != null) ...[
+            const SizedBox(width: 8),
+            InkWell(
+              onTap: onClose,
+              borderRadius: BorderRadius.circular(6),
+              child: Container(
+                padding: const EdgeInsets.all(5),
+                decoration: BoxDecoration(
+                  color: AppColors.card,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Icon(Icons.close, size: 15, color: AppColors.textSecondary),
+              ),
+            ),
+          ],
         ],
       ),
     );

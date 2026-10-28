@@ -126,6 +126,10 @@ class ClearMessagesEvent extends RequestBuilderEvent {
   const ClearMessagesEvent();
 }
 
+class ClearResponseEvent extends RequestBuilderEvent {
+  const ClearResponseEvent();
+}
+
 class SendRequestEvent extends RequestBuilderEvent {
   const SendRequestEvent();
 }

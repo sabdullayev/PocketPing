@@ -454,7 +454,10 @@ class _RequestBuilderScreenState extends State<RequestBuilderScreen>
                             )
                           : Column(
                               children: [
-                                MetricsBarWidget(response: state.response!),
+                                MetricsBarWidget(
+                                  response: state.response!,
+                                  onClose: () => bloc.add(const ClearResponseEvent()),
+                                ),
                                 Expanded(
                                   child: ResponseBodyView(response: state.response!),
                                 ),

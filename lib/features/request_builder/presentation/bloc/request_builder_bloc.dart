@@ -45,8 +45,13 @@ class RequestBuilderBloc extends Bloc<RequestBuilderEvent, RequestBuilderState> 
     on<FormatJsonBodyEvent>(_onFormatJsonBody);
     on<ImportCurlEvent>(_onImportCurl);
     on<ClearMessagesEvent>(_onClearMessages);
+    on<ClearResponseEvent>(_onClearResponse);
     on<SendRequestEvent>(_onSendRequest);
     on<LoadRequestEvent>(_onLoadRequest);
+  }
+
+  void _onClearResponse(ClearResponseEvent event, Emitter<RequestBuilderState> emit) {
+    emit(state.copyWith(clearResponse: true));
   }
 
   void _onClearMessages(ClearMessagesEvent event, Emitter<RequestBuilderState> emit) {

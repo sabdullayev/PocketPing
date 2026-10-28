@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../request_builder/domain/entities/http_method.dart';
 import '../../../request_builder/presentation/bloc/request_builder_bloc.dart';
 import '../../../request_builder/presentation/bloc/request_builder_event.dart';
 import '../../domain/entities/history_item_entity.dart';
@@ -20,6 +21,7 @@ class HistoryScreen extends StatefulWidget {
 class _HistoryScreenState extends State<HistoryScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _searchFilter = '';
+  HttpMethod? _selectedMethodFilter;
 
   @override
   void initState() {
@@ -98,6 +100,70 @@ class _HistoryScreenState extends State<HistoryScreen> {
             ),
           ),
 
+          // HTTP Method Filter Chips (GET, POST, PUT, DELETE, PATCH, HEAD)
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                // "ALL" Filter Chip
+                Padding(
+                  padding: const EdgeInsets.only(right: 6.0),
+                  child: ChoiceChip(
+                    label: const Text('ALL'),
+                    labelStyle: TextStyle(
+                      fontSize: 11,
+                      fontWeight: _selectedMethodFilter == null ? FontWeight.bold : FontWeight.normal,
+                      color: _selectedMethodFilter == null ? Colors.white : AppColors.textSecondary,
+                    ),
+                    selected: _selectedMethodFilter == null,
+                    selectedColor: AppColors.primary,
+                    backgroundColor: AppColors.card,
+                    showCheckmark: false,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(6),
+                      side: BorderSide(
+                        color: _selectedMethodFilter == null ? AppColors.primary : AppColors.border,
+                      ),
+                    ),
+                    onSelected: (_) => setState(() => _selectedMethodFilter = null),
+                  ),
+                ),
+                // Method Chips
+                ...HttpMethod.values.map((method) {
+                  final isSelected = _selectedMethodFilter == method;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 6.0),
+                    child: ChoiceChip(
+                      label: Text(method.label),
+                      labelStyle: TextStyle(
+                        fontSize: 11,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected ? Colors.black : method.color,
+                      ),
+                      selected: isSelected,
+                      selectedColor: method.color,
+                      backgroundColor: AppColors.card,
+                      showCheckmark: false,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(6),
+                        side: BorderSide(
+                          color: isSelected ? method.color : method.color.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      onSelected: (selected) {
+                        setState(() {
+                          _selectedMethodFilter = selected ? method : null;
+                        });
+                      },
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const SizedBox(height: 6),
+
           // History List
           Expanded(
             child: BlocBuilder<HistoryBloc, HistoryState>(
@@ -108,6 +174,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
                 if (state is HistoryLoadedState) {
                   final filtered = state.items.where((item) {
+                    if (_selectedMethodFilter != null && item.request.method != _selectedMethodFilter) {
+                      return false;
+                    }
                     if (_searchFilter.isEmpty) return true;
                     final matchUrl = item.request.url.toLowerCase().contains(_searchFilter);
                     final matchMethod = item.request.method.label.toLowerCase().contains(_searchFilter);

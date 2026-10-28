@@ -1,51 +1,197 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/constants/app_colors.dart';
 
-class JsonTreeView extends StatelessWidget {
+class JsonTreeView extends StatefulWidget {
   final dynamic data;
 
   const JsonTreeView({super.key, required this.data});
 
   @override
-  Widget build(BuildContext context) {
-    if (data == null) {
-      return const Center(
-        child: Text('Null or empty JSON', style: TextStyle(color: AppColors.textMuted)),
-      );
-    }
-
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      child: _JsonNodeWidget(
-        nodeKey: null,
-        value: data,
-        path: '',
-        isLast: true,
-      ),
-    );
-  }
+  State<JsonTreeView> createState() => _JsonTreeViewState();
 }
 
-class _JsonNodeWidget extends StatefulWidget {
-  final String? nodeKey;
-  final dynamic value;
+class _FlatTreeNode {
   final String path;
-  final bool isLast;
+  final String? keyName;
+  final dynamic value;
+  final int depth;
+  final bool isExpandable;
+  final bool isObject; // true for Map, false for List
+  final int childCount;
+  final bool isClosingBracket;
+  final String closingSymbol;
 
-  const _JsonNodeWidget({
-    required this.nodeKey,
-    required this.value,
+  const _FlatTreeNode({
     required this.path,
-    this.isLast = false,
+    this.keyName,
+    this.value,
+    required this.depth,
+    required this.isExpandable,
+    this.isObject = false,
+    this.childCount = 0,
+    this.isClosingBracket = false,
+    this.closingSymbol = '',
   });
+}
+
+class _JsonTreeViewState extends State<JsonTreeView> {
+  final Set<String> _expandedPaths = {};
+  List<_FlatTreeNode> _visibleNodes = [];
 
   @override
-  State<_JsonNodeWidget> createState() => _JsonNodeWidgetState();
-}
+  void initState() {
+    super.initState();
+    _initDefaultExpansion();
+    _rebuildFlatList();
+  }
 
-class _JsonNodeWidgetState extends State<_JsonNodeWidget> {
-  bool _isExpanded = true;
+  @override
+  void didUpdateWidget(covariant JsonTreeView oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.data != widget.data) {
+      _expandedPaths.clear();
+      _initDefaultExpansion();
+      _rebuildFlatList();
+    }
+  }
+
+  void _initDefaultExpansion() {
+    final data = widget.data;
+    if (data == null) return;
+
+    // Root is expanded
+    _expandedPaths.add('');
+
+    // Expand top-level keys if reasonable size
+    if (data is Map) {
+      for (final entry in data.entries) {
+        final k = entry.key.toString();
+        final v = entry.value;
+        if (v is Map && v.length <= 15) {
+          _expandedPaths.add(k);
+        } else if (v is List) {
+          // Expand array container so items [0], [1], ... are visible,
+          // but do NOT expand individual items by default to keep 500+ items instant
+          _expandedPaths.add(k);
+        }
+      }
+    }
+  }
+
+  void _rebuildFlatList() {
+    final data = widget.data;
+    if (data == null) {
+      setState(() => _visibleNodes = const []);
+      return;
+    }
+
+    final List<_FlatTreeNode> list = [];
+    _flatten(data, '', null, 0, list);
+    setState(() => _visibleNodes = list);
+  }
+
+  void _flatten(dynamic node, String path, String? keyName, int depth, List<_FlatTreeNode> list) {
+    if (node is Map) {
+      final isExpanded = _expandedPaths.contains(path);
+      list.add(_FlatTreeNode(
+        path: path,
+        keyName: keyName,
+        value: node,
+        depth: depth,
+        isExpandable: true,
+        isObject: true,
+        childCount: node.length,
+      ));
+
+      if (isExpanded) {
+        for (final entry in node.entries) {
+          final k = entry.key.toString();
+          final childPath = path.isEmpty ? k : '$path.$k';
+          _flatten(entry.value, childPath, k, depth + 1, list);
+        }
+        list.add(_FlatTreeNode(
+          path: '${path}_close',
+          depth: depth,
+          isExpandable: false,
+          isClosingBracket: true,
+          closingSymbol: '}',
+        ));
+      }
+    } else if (node is List) {
+      final isExpanded = _expandedPaths.contains(path);
+      list.add(_FlatTreeNode(
+        path: path,
+        keyName: keyName,
+        value: node,
+        depth: depth,
+        isExpandable: true,
+        isObject: false,
+        childCount: node.length,
+      ));
+
+      if (isExpanded) {
+        for (int i = 0; i < node.length; i++) {
+          final childPath = '$path[$i]';
+          _flatten(node[i], childPath, '[$i]', depth + 1, list);
+        }
+        list.add(_FlatTreeNode(
+          path: '${path}_close',
+          depth: depth,
+          isExpandable: false,
+          isClosingBracket: true,
+          closingSymbol: ']',
+        ));
+      }
+    } else {
+      // Primitive
+      list.add(_FlatTreeNode(
+        path: path,
+        keyName: keyName,
+        value: node,
+        depth: depth,
+        isExpandable: false,
+      ));
+    }
+  }
+
+  void _toggleNode(String path) {
+    if (_expandedPaths.contains(path)) {
+      _expandedPaths.remove(path);
+    } else {
+      _expandedPaths.add(path);
+    }
+    _rebuildFlatList();
+  }
+
+  void _expandAll() {
+    void collectPaths(dynamic node, String path) {
+      if (node is Map) {
+        _expandedPaths.add(path);
+        for (final entry in node.entries) {
+          final k = entry.key.toString();
+          final childPath = path.isEmpty ? k : '$path.$k';
+          collectPaths(entry.value, childPath);
+        }
+      } else if (node is List) {
+        _expandedPaths.add(path);
+        // Cap recursive expand for large lists to prevent excessive rows
+        final limit = math.min(node.length, 50);
+        for (int i = 0; i < limit; i++) {
+          collectPaths(node[i], '$path[$i]');
+        }
+      }
+    }
+
+    collectPaths(widget.data, '');
+    _rebuildFlatList();
+  }
+
+  void _collapseAll() {
+    _expandedPaths.clear();
+    _rebuildFlatList();
+  }
 
   void _showActionMenu(BuildContext context, String path, dynamic value) {
     showModalBottomSheet(
@@ -105,7 +251,7 @@ class _JsonNodeWidgetState extends State<_JsonNodeWidget> {
                     Navigator.pop(ctx);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
-                        content: Text('Copied value: ${value.toString()}'),
+                        content: Text('Copied value to clipboard'),
                         duration: const Duration(seconds: 1),
                         backgroundColor: AppColors.surfaceElevated,
                       ),
@@ -122,199 +268,111 @@ class _JsonNodeWidgetState extends State<_JsonNodeWidget> {
 
   @override
   Widget build(BuildContext context) {
-    final val = widget.value;
-
-    if (val is Map) {
-      return _buildObjectNode(val);
-    } else if (val is List) {
-      return _buildArrayNode(val);
-    } else {
-      return _buildPrimitiveNode(val);
+    if (widget.data == null) {
+      return const Center(
+        child: Text('Null or empty JSON', style: TextStyle(color: AppColors.textMuted)),
+      );
     }
-  }
-
-  Widget _buildObjectNode(Map map) {
-    final count = map.length;
-    final keys = map.keys.toList();
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        InkWell(
-          onTap: () => setState(() => _isExpanded = !_isExpanded),
-          onLongPress: widget.path.isNotEmpty ? () => _showActionMenu(context, widget.path, map) : null,
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
-                  size: 18,
-                  color: AppColors.textSecondary,
+        // Tree Toolbar
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
+          color: AppColors.surface.withValues(alpha: 0.5),
+          child: Row(
+            children: [
+              Expanded(
+                child: Text(
+                  '${_visibleNodes.length} nodes visible',
+                  style: const TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'monospace'),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (widget.nodeKey != null) ...[
-                  Text(
-                    '"${widget.nodeKey}": ',
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                Text(
-                  _isExpanded ? '{' : '{ $count items }',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  ),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 ),
-              ],
-            ),
+                onPressed: _expandAll,
+                icon: const Icon(Icons.unfold_more, size: 14, color: AppColors.primary),
+                label: const Text('Expand', style: TextStyle(fontSize: 11, color: AppColors.primary)),
+              ),
+              const SizedBox(width: 8),
+              TextButton.icon(
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                onPressed: _collapseAll,
+                icon: const Icon(Icons.unfold_less, size: 14, color: AppColors.textMuted),
+                label: const Text('Collapse', style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+              ),
+            ],
           ),
         ),
-        if (_isExpanded) ...[
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: List.generate(keys.length, (i) {
-                final k = keys[i].toString();
-                final childPath = widget.path.isEmpty ? k : '${widget.path}.$k';
-                return _JsonNodeWidget(
-                  nodeKey: k,
-                  value: map[keys[i]],
-                  path: childPath,
-                  isLast: i == keys.length - 1,
-                );
-              }),
-            ),
+        const Divider(height: 1, color: AppColors.border),
+        // 120fps Virtualized Tree List
+        Expanded(
+          child: ListView.builder(
+            itemCount: _visibleNodes.length,
+            itemExtent: 26.0,
+            physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            itemBuilder: (context, index) {
+              final node = _visibleNodes[index];
+              return _buildNodeRow(node);
+            },
           ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4.0),
-            child: Text(
-              widget.isLast ? '}' : '},',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontFamily: 'monospace',
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
+        ),
       ],
     );
   }
 
-  Widget _buildArrayNode(List list) {
-    final count = list.length;
+  Widget _buildNodeRow(_FlatTreeNode node) {
+    final indent = (node.depth * 14.0) + 8.0;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        InkWell(
-          onTap: () => setState(() => _isExpanded = !_isExpanded),
-          onLongPress: widget.path.isNotEmpty ? () => _showActionMenu(context, widget.path, list) : null,
-          borderRadius: BorderRadius.circular(4),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 2.0),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  _isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
-                  size: 18,
-                  color: AppColors.textSecondary,
-                ),
-                if (widget.nodeKey != null) ...[
-                  Text(
-                    '"${widget.nodeKey}": ',
-                    style: const TextStyle(
-                      color: AppColors.accent,
-                      fontFamily: 'monospace',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-                Text(
-                  _isExpanded ? '[' : '[ $count items ]',
-                  style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+    if (node.isClosingBracket) {
+      return Padding(
+        padding: EdgeInsets.only(left: indent),
+        child: Align(
+          alignment: Alignment.centerLeft,
+          child: Text(
+            node.closingSymbol,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontFamily: 'monospace',
+              fontSize: 12,
             ),
           ),
         ),
-        if (_isExpanded) ...[
-          Padding(
-            padding: const EdgeInsets.only(left: 16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: List.generate(list.length, (i) {
-                final childPath = '${widget.path}[$i]';
-                return _JsonNodeWidget(
-                  nodeKey: null,
-                  value: list[i],
-                  path: childPath,
-                  isLast: i == list.length - 1,
-                );
-              }),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.only(left: 4.0),
-            child: Text(
-              widget.isLast ? ']' : '],',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontFamily: 'monospace',
-                fontSize: 12,
-              ),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-
-  Widget _buildPrimitiveNode(dynamic val) {
-    Color valColor = AppColors.methodGet;
-    String valString = val.toString();
-
-    if (val is String) {
-      valColor = const Color(0xFF98C379); // String green
-      valString = '"$val"';
-    } else if (val is num) {
-      valColor = const Color(0xFFD19A66); // Number orange
-    } else if (val is bool) {
-      valColor = const Color(0xFFC678DD); // Bool purple
-    } else if (val == null) {
-      valColor = AppColors.textMuted;
-      valString = 'null';
+      );
     }
 
-    final lineSuffix = widget.isLast ? '' : ',';
+    final isExpanded = _expandedPaths.contains(node.path);
 
     return InkWell(
-      onLongPress: () => _showActionMenu(context, widget.path, val),
-      borderRadius: BorderRadius.circular(4),
+      onTap: node.isExpandable ? () => _toggleNode(node.path) : null,
+      onLongPress: () => _showActionMenu(context, node.path, node.value),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 2.0, horizontal: 4.0),
+        padding: EdgeInsets.only(left: indent, right: 8),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (widget.nodeKey != null) ...[
+            if (node.isExpandable) ...[
+              Icon(
+                isExpanded ? Icons.arrow_drop_down : Icons.arrow_right,
+                size: 18,
+                color: AppColors.textSecondary,
+              ),
+            ] else ...[
+              const SizedBox(width: 18),
+            ],
+            if (node.keyName != null) ...[
               Text(
-                '"${widget.nodeKey}": ',
+                node.keyName!.startsWith('[') ? '${node.keyName}: ' : '"${node.keyName}": ',
                 style: const TextStyle(
                   color: AppColors.accent,
                   fontFamily: 'monospace',
@@ -323,17 +381,51 @@ class _JsonNodeWidgetState extends State<_JsonNodeWidget> {
                 ),
               ),
             ],
-            Flexible(
-              child: Text(
-                '$valString$lineSuffix',
-                style: TextStyle(
-                  color: valColor,
+            if (node.isExpandable) ...[
+              Text(
+                node.isObject
+                    ? (isExpanded ? '{' : '{ ${node.childCount} keys }')
+                    : (isExpanded ? '[' : '[ ${node.childCount} items ]'),
+                style: const TextStyle(
+                  color: AppColors.textSecondary,
                   fontFamily: 'monospace',
                   fontSize: 12,
                 ),
               ),
-            ),
+            ] else ...[
+              _buildPrimitiveValue(node.value),
+            ],
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPrimitiveValue(dynamic val) {
+    Color valColor = AppColors.methodGet;
+    String valString = val.toString();
+
+    if (val == null) {
+      valColor = const Color(0xFFC792EA);
+      valString = 'null';
+    } else if (val is bool) {
+      valColor = const Color(0xFFC792EA);
+    } else if (val is num) {
+      valColor = AppColors.accent;
+    } else if (val is String) {
+      valColor = AppColors.statusSuccess;
+      valString = '"$val"';
+    }
+
+    return Expanded(
+      child: Text(
+        valString,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: valColor,
+          fontFamily: 'monospace',
+          fontSize: 12,
         ),
       ),
     );

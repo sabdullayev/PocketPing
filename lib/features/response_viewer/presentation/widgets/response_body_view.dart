@@ -17,9 +17,10 @@ class ResponseBodyView extends StatefulWidget {
 
 class _ResponseBodyViewState extends State<ResponseBodyView>
     with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+  late TabController _tabController;
   String _formattedJson = '';
   dynamic _parsedJson;
+  List<String> _lines = [];
   bool _isFormatting = false;
 
   @override
@@ -51,12 +52,12 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
   Future<void> _formatContent() async {
     if (widget.response.isJson && widget.response.bodyString.isNotEmpty) {
       setState(() => _isFormatting = true);
-      final formatted = await JsonIsolateService.formatJson(widget.response.bodyString);
-      final parsed = await JsonIsolateService.parseJson(widget.response.bodyString);
+      final result = await JsonIsolateService.processJson(widget.response.bodyString);
       if (mounted) {
         setState(() {
-          _formattedJson = formatted;
-          _parsedJson = parsed;
+          _formattedJson = result.formattedJson;
+          _parsedJson = result.parsedJson;
+          _lines = result.lines;
           _isFormatting = false;
         });
       }
@@ -64,6 +65,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
       setState(() {
         _formattedJson = widget.response.bodyString;
         _parsedJson = null;
+        _lines = widget.response.bodyString.split('\n');
         _isFormatting = false;
       });
     }
@@ -86,6 +88,20 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
     );
   }
 
+  String? _getAuthHeader() {
+    for (final entry in widget.response.headers.entries) {
+      if (entry.key.toLowerCase() == 'www-authenticate') {
+        final val = entry.value.join(', ');
+        final match = RegExp(r'error_description="([^"]+)"').firstMatch(val);
+        if (match != null) {
+          return match.group(1);
+        }
+        return val;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isJson = widget.response.isJson;
@@ -104,9 +120,9 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
                   tabAlignment: TabAlignment.start,
                   labelPadding: const EdgeInsets.symmetric(horizontal: 12),
                   tabs: [
-                    if (isJson) const Tab(text: 'Tree'),
                     Tab(text: isJson ? 'Pretty' : 'Preview'),
                     const Tab(text: 'Raw'),
+                    if (isJson) const Tab(text: 'Tree'),
                     Tab(text: 'Headers (${widget.response.headers.length})'),
                   ],
                 ),
@@ -127,29 +143,15 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
           child: TabBarView(
             controller: _tabController,
             children: [
-              if (isJson) _buildTreeTab(),
               _buildPrettyTab(),
               _buildRawTab(),
+              if (isJson) _buildTreeTab(),
               _buildHeadersTab(),
             ],
           ),
         ),
       ],
     );
-  }
-
-  String? _getAuthHeader() {
-    for (final entry in widget.response.headers.entries) {
-      if (entry.key.toLowerCase() == 'www-authenticate') {
-        final val = entry.value.join(', ');
-        final match = RegExp(r'error_description="([^"]+)"').firstMatch(val);
-        if (match != null) {
-          return match.group(1);
-        }
-        return val;
-      }
-    }
-    return null;
   }
 
   Widget _buildTreeTab() {
@@ -247,6 +249,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
               Expanded(
                 child: VirtualizedCodeViewer(
                   content: widget.response.isJson ? _formattedJson : widget.response.bodyString,
+                  preSplitLines: _lines,
                   isJson: widget.response.isJson,
                 ),
               ),
@@ -266,6 +269,7 @@ class _ResponseBodyViewState extends State<ResponseBodyView>
 
     return VirtualizedCodeViewer(
       content: widget.response.isJson ? _formattedJson : widget.response.bodyString,
+      preSplitLines: _lines,
       isJson: widget.response.isJson,
     );
   }
